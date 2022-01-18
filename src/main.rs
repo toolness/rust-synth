@@ -50,6 +50,7 @@ impl Player {
     }
 
     fn write_silence<T: Sample>(&mut self, data: &mut [T], _: &cpal::OutputCallbackInfo) {
+        // TODO: Use chunks_mut() to access channels: https://github.com/RustAudio/cpal/blob/master/examples/beep.rs#L127
         for sample in data.iter_mut() {
             *sample = Sample::from(&0i16);
         }
