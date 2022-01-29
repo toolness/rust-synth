@@ -22,12 +22,12 @@ fn main() {
         supported_config
     );
     let config = supported_config.into();
-    let mut freq = 261.63; // Middle C, taken from https://pages.mtu.edu/~suits/notefreqs.html
-    let freq_mutex = Arc::new(Mutex::new(freq));
+    let mut frequency = 261.63; // Middle C, taken from https://pages.mtu.edu/~suits/notefreqs.html
+    let shape = Arc::new(Mutex::new(AudioShape { frequency }));
     let stream = match sample_format {
-        SampleFormat::F32 => Player::get_stream::<f32>(device, &config, freq_mutex.clone()),
-        SampleFormat::I16 => Player::get_stream::<i16>(device, &config, freq_mutex.clone()),
-        SampleFormat::U16 => Player::get_stream::<u16>(device, &config, freq_mutex.clone()),
+        SampleFormat::F32 => Player::get_stream::<f32>(device, &config, shape.clone()),
+        SampleFormat::I16 => Player::get_stream::<i16>(device, &config, shape.clone()),
+        SampleFormat::U16 => Player::get_stream::<u16>(device, &config, shape.clone()),
     };
     stream.play().unwrap();
 
@@ -38,9 +38,9 @@ fn main() {
 
         for _ in 0..*semitones {
             // https://www.reddit.com/r/musictheory/comments/kyv9nd/how_many_hz_are_there_between_two_semitones/
-            freq = freq * 2.0f64.powf(1.0 / 12.0);
+            frequency *= 2.0f64.powf(1.0 / 12.0);
         }
-        *freq_mutex.lock().unwrap() = freq;
+        *shape.lock().unwrap() = AudioShape { frequency };
     }
 
     thread::sleep(one_beat);
@@ -48,10 +48,15 @@ fn main() {
     println!("Bye!");
 }
 
+#[derive(Copy, Clone)]
+struct AudioShape {
+    frequency: f64,
+}
+
 struct Player {
     num_channels: u16,
     sample_rate: usize,
-    tone_frequency: Arc<Mutex<f64>>,
+    shape: Arc<Mutex<AudioShape>>,
     latest_pos_in_wave: f64,
 }
 
@@ -59,12 +64,12 @@ impl Player {
     fn get_stream<T: Sample>(
         device: Device,
         config: &StreamConfig,
-        tone_frequency: Arc<Mutex<f64>>,
+        shape: Arc<Mutex<AudioShape>>,
     ) -> Stream {
         let mut player = Player {
             num_channels: config.channels,
             sample_rate: config.sample_rate.0 as usize,
-            tone_frequency,
+            shape,
             latest_pos_in_wave: 0.0,
         };
         let err_fn = |err| eprintln!("an error occurred on the output audio stream: {}", err);
@@ -78,8 +83,8 @@ impl Player {
     }
 
     fn write_audio<T: Sample>(&mut self, data: &mut [T], _: &cpal::OutputCallbackInfo) {
-        let tone_frequency = *self.tone_frequency.lock().unwrap();
-        let samples_per_wave = self.sample_rate as f64 / tone_frequency;
+        let shape = *self.shape.lock().unwrap();
+        let samples_per_wave = self.sample_rate as f64 / shape.frequency;
         let wave_delta_per_sample = 1.0 / samples_per_wave;
 
         // We use chunks_mut() to access individual channels:
