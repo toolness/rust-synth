@@ -1,7 +1,10 @@
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{Device, Sample, SampleFormat, Stream, StreamConfig};
 use std::sync::{Arc, Mutex};
-use std::{thread, time};
+use std::thread;
+use std::time::Duration;
+
+const TWO_PI: f64 = 2.0 * std::f64::consts::PI;
 
 fn main() {
     println!("Hello, world!");
@@ -23,15 +26,18 @@ fn main() {
     );
     let config = supported_config.into();
     let mut frequency = 261.63; // Middle C, taken from https://pages.mtu.edu/~suits/notefreqs.html
-    let shape = Arc::new(Mutex::new(AudioShape { frequency }));
+    let shape_mutex = Arc::new(Mutex::new(AudioShape {
+        frequency,
+        volume: 255,
+    }));
     let stream = match sample_format {
-        SampleFormat::F32 => Player::get_stream::<f32>(device, &config, shape.clone()),
-        SampleFormat::I16 => Player::get_stream::<i16>(device, &config, shape.clone()),
-        SampleFormat::U16 => Player::get_stream::<u16>(device, &config, shape.clone()),
+        SampleFormat::F32 => Player::get_stream::<f32>(device, &config, shape_mutex.clone()),
+        SampleFormat::I16 => Player::get_stream::<i16>(device, &config, shape_mutex.clone()),
+        SampleFormat::U16 => Player::get_stream::<u16>(device, &config, shape_mutex.clone()),
     };
     stream.play().unwrap();
 
-    let one_beat = time::Duration::from_millis(500);
+    let one_beat = Duration::from_millis(500);
 
     for semitones in [2, 2, 1, 2, 2, 2, 1].iter() {
         thread::sleep(one_beat);
@@ -40,10 +46,14 @@ fn main() {
             // https://www.reddit.com/r/musictheory/comments/kyv9nd/how_many_hz_are_there_between_two_semitones/
             frequency *= 2.0f64.powf(1.0 / 12.0);
         }
-        *shape.lock().unwrap() = AudioShape { frequency };
+        shape_mutex.lock().unwrap().frequency = frequency;
     }
 
     thread::sleep(one_beat);
+
+    // Avoid popping.
+    shape_mutex.lock().unwrap().volume = 0;
+    thread::sleep(Duration::from_millis(100));
 
     println!("Bye!");
 }
@@ -51,6 +61,7 @@ fn main() {
 #[derive(Copy, Clone)]
 struct AudioShape {
     frequency: f64,
+    volume: u8,
 }
 
 struct Player {
@@ -58,6 +69,7 @@ struct Player {
     sample_rate: usize,
     shape: Arc<Mutex<AudioShape>>,
     latest_pos_in_wave: f64,
+    latest_volume: u8,
 }
 
 impl Player {
@@ -71,6 +83,7 @@ impl Player {
             sample_rate: config.sample_rate.0 as usize,
             shape,
             latest_pos_in_wave: 0.0,
+            latest_volume: 0,
         };
         let err_fn = |err| eprintln!("an error occurred on the output audio stream: {}", err);
         device
@@ -82,6 +95,17 @@ impl Player {
             .unwrap()
     }
 
+    fn move_to_target_volume(&mut self, target: u8) {
+        if self.latest_volume == target {
+            return;
+        }
+        if self.latest_volume < target {
+            self.latest_volume += 1;
+        } else {
+            self.latest_volume -= 1;
+        }
+    }
+
     fn write_audio<T: Sample>(&mut self, data: &mut [T], _: &cpal::OutputCallbackInfo) {
         let shape = *self.shape.lock().unwrap();
         let samples_per_wave = self.sample_rate as f64 / shape.frequency;
@@ -90,13 +114,15 @@ impl Player {
         // We use chunks_mut() to access individual channels:
         // https://github.com/RustAudio/cpal/blob/master/examples/beep.rs#L127
         for sample in data.chunks_mut(self.num_channels as usize) {
-            let value = (self.latest_pos_in_wave * 2.0 * std::f64::consts::PI).sin() as f32;
+            let volume_scale = self.latest_volume as f64 / std::u8::MAX as f64;
+            let value = ((self.latest_pos_in_wave * TWO_PI).sin() * volume_scale) as f32;
             let sample_value = Sample::from(&value);
 
             for channel_sample in sample.iter_mut() {
                 *channel_sample = sample_value;
             }
             self.latest_pos_in_wave = (self.latest_pos_in_wave + wave_delta_per_sample) % 1.0;
+            self.move_to_target_volume(shape.volume);
         }
     }
 }
