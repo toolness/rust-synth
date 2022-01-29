@@ -91,7 +91,7 @@ impl TryFrom<&str> for MidiNote {
 
 #[cfg(test)]
 mod tests {
-    use super::MidiNote;
+    use crate::{MidiNote, MidiNoteParseError};
 
     #[test]
     fn test_a4_works() {
@@ -126,6 +126,40 @@ mod tests {
     fn test_octaves_work() {
         assert_eq!("A0".try_into(), Ok(MidiNote(21)));
         assert_eq!("G9".try_into(), Ok(MidiNote(127)));
+    }
+
+    fn try_parse(value: &'static str) -> Result<MidiNote, MidiNoteParseError> {
+        value.try_into()
+    }
+
+    #[test]
+    fn test_invalid_length_error() {
+        assert_eq!(try_parse("A"), Err(MidiNoteParseError::InvalidLength));
+        assert_eq!(try_parse("Ab4k"), Err(MidiNoteParseError::InvalidLength));
+    }
+
+    #[test]
+    fn test_invalid_note_character() {
+        assert_eq!(
+            try_parse("Z4"),
+            Err(MidiNoteParseError::InvalidNoteCharacter)
+        );
+    }
+
+    #[test]
+    fn test_invalid_accidental_character() {
+        assert_eq!(
+            try_parse("Ak4"),
+            Err(MidiNoteParseError::InvalidAccidentalCharacter)
+        );
+    }
+
+    #[test]
+    fn test_invalid_octave_character() {
+        assert_eq!(
+            try_parse("Ap"),
+            Err(MidiNoteParseError::InvalidOctaveCharacter)
+        );
     }
 }
 
