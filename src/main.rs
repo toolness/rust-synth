@@ -42,10 +42,9 @@ fn main() {
     for semitones in [2, 2, 1, 2, 2, 2, 1].iter() {
         thread::sleep(one_beat);
 
-        for _ in 0..*semitones {
-            // https://www.reddit.com/r/musictheory/comments/kyv9nd/how_many_hz_are_there_between_two_semitones/
-            frequency *= 2.0f64.powf(1.0 / 12.0);
-        }
+        // https://en.wikipedia.org/wiki/Equal_temperament
+        frequency *= 2.0f64.powf(*semitones as f64 / 12.0);
+
         shape_mutex.lock().unwrap().frequency = frequency;
     }
 
