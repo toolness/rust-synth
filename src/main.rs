@@ -22,7 +22,7 @@ fn main() {
         supported_config
     );
     let config = supported_config.into();
-    let mut freq = 261.63; // Middle C
+    let mut freq = 261.63; // Middle C, taken from https://pages.mtu.edu/~suits/notefreqs.html
     let freq_mutex = Arc::new(Mutex::new(freq));
     let stream = match sample_format {
         SampleFormat::F32 => Player::get_stream::<f32>(device, &config, freq_mutex.clone()),
