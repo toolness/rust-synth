@@ -176,6 +176,14 @@ impl ops::Neg for Semitones {
     }
 }
 
+impl ops::Neg for &Semitones {
+    type Output = Semitones;
+
+    fn neg(self) -> Self::Output {
+        Semitones(-self.0)
+    }
+}
+
 impl ops::Add<Semitones> for MidiNote {
     type Output = MidiNote;
 
@@ -239,7 +247,7 @@ fn main() {
     let one_beat = Duration::from_millis(500);
     let mut note: MidiNote = tonic;
 
-    let down: Vec<Semitones> = MINOR_HARMONIC_SCALE.iter().rev().map(|s| -(*s)).collect();
+    let down: Vec<Semitones> = MINOR_HARMONIC_SCALE.iter().rev().map(|s| -s).collect();
     for semitones in MAJOR_SCALE.iter().chain(down.iter()) {
         thread::sleep(one_beat);
         note += *semitones;
