@@ -247,10 +247,13 @@ fn main() {
     let one_beat = Duration::from_millis(500);
     let mut note: MidiNote = tonic;
 
-    let down: Vec<Semitones> = MINOR_HARMONIC_SCALE.iter().rev().map(|s| -s).collect();
-    for semitones in MAJOR_SCALE.iter().chain(down.iter()) {
+    for semitones in MAJOR_SCALE
+        .iter()
+        .copied()
+        .chain(MINOR_HARMONIC_SCALE.iter().rev().map(|s| -s))
+    {
         thread::sleep(one_beat);
-        note += *semitones;
+        note += semitones;
         shape_mutex.lock().unwrap().frequency = note.frequency();
     }
 
