@@ -1,5 +1,6 @@
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{Device, Sample, SampleFormat, Stream, StreamConfig};
+use std::sync::{Arc, Mutex};
 use std::{thread, time};
 
 fn main() {
@@ -21,32 +22,49 @@ fn main() {
         supported_config
     );
     let config = supported_config.into();
+    let mut freq = 261.63; // Middle C
+    let freq_mutex = Arc::new(Mutex::new(freq));
     let stream = match sample_format {
-        SampleFormat::F32 => Player::get_stream::<f32>(device, &config),
-        SampleFormat::I16 => Player::get_stream::<i16>(device, &config),
-        SampleFormat::U16 => Player::get_stream::<u16>(device, &config),
+        SampleFormat::F32 => Player::get_stream::<f32>(device, &config, freq_mutex.clone()),
+        SampleFormat::I16 => Player::get_stream::<i16>(device, &config, freq_mutex.clone()),
+        SampleFormat::U16 => Player::get_stream::<u16>(device, &config, freq_mutex.clone()),
     };
     stream.play().unwrap();
 
-    println!("Sleeping for a bit.");
-    let one_sec = time::Duration::from_secs(1);
-    thread::sleep(one_sec);
+    let one_beat = time::Duration::from_millis(500);
+
+    for semitones in [2, 2, 1, 2, 2, 2, 1].iter() {
+        thread::sleep(one_beat);
+
+        for _ in 0..*semitones {
+            // https://www.reddit.com/r/musictheory/comments/kyv9nd/how_many_hz_are_there_between_two_semitones/
+            freq = freq * 2.0f64.powf(1.0 / 12.0);
+        }
+        *freq_mutex.lock().unwrap() = freq;
+    }
+
+    thread::sleep(one_beat);
+
     println!("Bye!");
 }
 
 struct Player {
     num_channels: u16,
     sample_rate: usize,
-    tone_frequency: usize,
+    tone_frequency: Arc<Mutex<f64>>,
     latest_pos_in_wave: f64,
 }
 
 impl Player {
-    fn get_stream<T: Sample>(device: Device, config: &StreamConfig) -> Stream {
+    fn get_stream<T: Sample>(
+        device: Device,
+        config: &StreamConfig,
+        tone_frequency: Arc<Mutex<f64>>,
+    ) -> Stream {
         let mut player = Player {
             num_channels: config.channels,
             sample_rate: config.sample_rate.0 as usize,
-            tone_frequency: 440,
+            tone_frequency,
             latest_pos_in_wave: 0.0,
         };
         let err_fn = |err| eprintln!("an error occurred on the output audio stream: {}", err);
@@ -60,8 +78,9 @@ impl Player {
     }
 
     fn write_audio<T: Sample>(&mut self, data: &mut [T], _: &cpal::OutputCallbackInfo) {
-        let samples_per_wave = self.sample_rate / self.tone_frequency;
-        let wave_delta_per_sample = 1.0 / samples_per_wave as f64;
+        let tone_frequency = *self.tone_frequency.lock().unwrap();
+        let samples_per_wave = self.sample_rate as f64 / tone_frequency;
+        let wave_delta_per_sample = 1.0 / samples_per_wave;
 
         // We use chunks_mut() to access individual channels:
         // https://github.com/RustAudio/cpal/blob/master/examples/beep.rs#L127
