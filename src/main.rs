@@ -38,7 +38,7 @@ struct Player {
     num_channels: u16,
     sample_rate: usize,
     tone_frequency: usize,
-    latest_sample: usize,
+    latest_pos_in_wave: f64,
 }
 
 impl Player {
@@ -47,7 +47,7 @@ impl Player {
             num_channels: config.channels,
             sample_rate: config.sample_rate.0 as usize,
             tone_frequency: 440,
-            latest_sample: 0,
+            latest_pos_in_wave: 0.0,
         };
         let err_fn = |err| eprintln!("an error occurred on the output audio stream: {}", err);
         device
@@ -61,18 +61,18 @@ impl Player {
 
     fn write_audio<T: Sample>(&mut self, data: &mut [T], _: &cpal::OutputCallbackInfo) {
         let samples_per_wave = self.sample_rate / self.tone_frequency;
+        let wave_delta_per_sample = 1.0 / samples_per_wave as f64;
 
         // We use chunks_mut() to access individual channels:
         // https://github.com/RustAudio/cpal/blob/master/examples/beep.rs#L127
         for sample in data.chunks_mut(self.num_channels as usize) {
-            let curr_pos_in_wave =
-                (self.latest_sample % samples_per_wave) as f64 / samples_per_wave as f64;
-            let value = (curr_pos_in_wave * 2.0 * std::f64::consts::PI).sin();
+            let value = (self.latest_pos_in_wave * 2.0 * std::f64::consts::PI).sin() as f32;
+            let sample_value = Sample::from(&value);
 
             for channel_sample in sample.iter_mut() {
-                *channel_sample = Sample::from(&(value as f32));
+                *channel_sample = sample_value;
             }
-            self.latest_sample += 1;
+            self.latest_pos_in_wave = (self.latest_pos_in_wave + wave_delta_per_sample) % 1.0;
         }
     }
 }
