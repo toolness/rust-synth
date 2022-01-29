@@ -1,8 +1,8 @@
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{Device, Sample, SampleFormat, Stream, StreamConfig};
 use std::sync::{Arc, Mutex};
-use std::thread;
 use std::time::Duration;
+use std::{ops, thread};
 
 const TWO_PI: f64 = 2.0 * std::f64::consts::PI;
 
@@ -16,6 +16,8 @@ const SEMITONES_PER_OCTAVE: i8 = 12;
 const SEMITONE: Semitones = Semitones(1);
 const TONE: Semitones = Semitones(2);
 const MAJOR_SCALE: [Semitones; 7] = [TONE, TONE, SEMITONE, TONE, TONE, TONE, SEMITONE];
+const MINOR_HARMONIC_SCALE: [Semitones; 7] =
+    [TONE, SEMITONE, TONE, TONE, SEMITONE, Semitones(3), SEMITONE];
 
 #[derive(Copy, Clone, PartialEq, Debug)]
 struct MidiNote(i8);
@@ -166,7 +168,15 @@ mod tests {
 #[derive(Copy, Clone)]
 struct Semitones(i8);
 
-impl std::ops::Add<Semitones> for MidiNote {
+impl ops::Neg for Semitones {
+    type Output = Semitones;
+
+    fn neg(self) -> Self::Output {
+        Semitones(-self.0)
+    }
+}
+
+impl ops::Add<Semitones> for MidiNote {
     type Output = MidiNote;
 
     fn add(self, rhs: Semitones) -> MidiNote {
@@ -175,13 +185,13 @@ impl std::ops::Add<Semitones> for MidiNote {
     }
 }
 
-impl std::ops::AddAssign<Semitones> for MidiNote {
+impl ops::AddAssign<Semitones> for MidiNote {
     fn add_assign(&mut self, rhs: Semitones) {
         self.0 = self.0 + rhs.0;
     }
 }
 
-impl std::ops::Sub<Semitones> for MidiNote {
+impl ops::Sub<Semitones> for MidiNote {
     type Output = MidiNote;
 
     fn sub(self, rhs: Semitones) -> MidiNote {
@@ -190,7 +200,7 @@ impl std::ops::Sub<Semitones> for MidiNote {
     }
 }
 
-impl std::ops::SubAssign<Semitones> for MidiNote {
+impl ops::SubAssign<Semitones> for MidiNote {
     fn sub_assign(&mut self, rhs: Semitones) {
         self.0 = self.0 - rhs.0;
     }
@@ -229,7 +239,8 @@ fn main() {
     let one_beat = Duration::from_millis(500);
     let mut note: MidiNote = tonic;
 
-    for semitones in MAJOR_SCALE.iter() {
+    let down: Vec<Semitones> = MINOR_HARMONIC_SCALE.iter().rev().map(|s| -(*s)).collect();
+    for semitones in MAJOR_SCALE.iter().chain(down.iter()) {
         thread::sleep(one_beat);
         note += *semitones;
         shape_mutex.lock().unwrap().frequency = note.frequency();
