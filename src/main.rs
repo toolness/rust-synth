@@ -34,11 +34,15 @@ fn main() {
     println!("Bye!");
 }
 
-struct Player {}
+struct Player {
+    num_channels: u16,
+}
 
 impl Player {
     fn get_stream<T: Sample>(device: Device, config: &StreamConfig) -> Stream {
-        let mut player = Player {};
+        let mut player = Player {
+            num_channels: config.channels,
+        };
         let err_fn = |err| eprintln!("an error occurred on the output audio stream: {}", err);
         device
             .build_output_stream(
@@ -50,9 +54,12 @@ impl Player {
     }
 
     fn write_silence<T: Sample>(&mut self, data: &mut [T], _: &cpal::OutputCallbackInfo) {
-        // TODO: Use chunks_mut() to access channels: https://github.com/RustAudio/cpal/blob/master/examples/beep.rs#L127
-        for sample in data.iter_mut() {
-            *sample = Sample::from(&0i16);
+        // We use chunks_mut() to access individual channels:
+        // https://github.com/RustAudio/cpal/blob/master/examples/beep.rs#L127
+        for sample in data.chunks_mut(self.num_channels as usize) {
+            for channel_sample in sample.iter_mut() {
+                *channel_sample = Sample::from(&0i16);
+            }
         }
     }
 }
