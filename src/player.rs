@@ -10,13 +10,34 @@ pub struct AudioShape {
     pub volume: u8,
 }
 
+struct AudioShapeState {
+    pos_in_wave: f64,
+    volume: u8,
+}
+
+impl AudioShapeState {
+    fn advance_pos_in_wave(&mut self, amount: f64) {
+        self.pos_in_wave = (self.pos_in_wave + amount) % 1.0;
+    }
+
+    fn move_to_volume(&mut self, target: u8) {
+        if self.volume == target {
+            return;
+        }
+        if self.volume < target {
+            self.volume += 1;
+        } else {
+            self.volume -= 1;
+        }
+    }
+}
+
 pub struct Player {
     num_channels: u16,
     sample_rate: usize,
     shape_mutex: Arc<Mutex<AudioShape>>,
     shape: AudioShape,
-    latest_pos_in_wave: f64,
-    latest_volume: u8,
+    shape_state: AudioShapeState,
 }
 
 impl Player {
@@ -31,8 +52,10 @@ impl Player {
             sample_rate: config.sample_rate.0 as usize,
             shape_mutex,
             shape,
-            latest_pos_in_wave: 0.0,
-            latest_volume: 0,
+            shape_state: AudioShapeState {
+                pos_in_wave: 0.0,
+                volume: 0,
+            },
         };
         let err_fn = |err| eprintln!("an error occurred on the output audio stream: {}", err);
         device
@@ -42,17 +65,6 @@ impl Player {
                 err_fn,
             )
             .unwrap()
-    }
-
-    fn move_to_target_volume(&mut self, target: u8) {
-        if self.latest_volume == target {
-            return;
-        }
-        if self.latest_volume < target {
-            self.latest_volume += 1;
-        } else {
-            self.latest_volume -= 1;
-        }
     }
 
     /// Try to update the shape from our mutex, but don't block, because we're
@@ -71,15 +83,15 @@ impl Player {
         // We use chunks_mut() to access individual channels:
         // https://github.com/RustAudio/cpal/blob/master/examples/beep.rs#L127
         for sample in data.chunks_mut(self.num_channels as usize) {
-            let volume_scale = self.latest_volume as f64 / std::u8::MAX as f64;
-            let value = ((self.latest_pos_in_wave * TWO_PI).sin() * volume_scale) as f32;
+            let volume_scale = self.shape_state.volume as f64 / std::u8::MAX as f64;
+            let value = ((self.shape_state.pos_in_wave * TWO_PI).sin() * volume_scale) as f32;
             let sample_value = Sample::from(&value);
 
             for channel_sample in sample.iter_mut() {
                 *channel_sample = sample_value;
             }
-            self.latest_pos_in_wave = (self.latest_pos_in_wave + wave_delta_per_sample) % 1.0;
-            self.move_to_target_volume(self.shape.volume);
+            self.shape_state.advance_pos_in_wave(wave_delta_per_sample);
+            self.shape_state.move_to_volume(self.shape.volume);
         }
     }
 }
