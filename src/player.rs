@@ -10,22 +10,55 @@ pub struct AudioShape {
     pub volume: u8,
 }
 
-struct AudioShapeState {
+struct AudioShapeSynthesizer {
+    sample_rate: usize,
     pos_in_wave: f64,
     volume: u8,
+    wave_delta_per_sample: f64,
+    target: AudioShape,
 }
 
-impl AudioShapeState {
-    fn value(&self) -> f64 {
+impl Iterator for AudioShapeSynthesizer {
+    type Item = f64;
+
+    fn next(&mut self) -> Option<Self::Item> {
         let volume_scale = self.volume as f64 / std::u8::MAX as f64;
-        (self.pos_in_wave * TWO_PI).sin() * volume_scale
+        let value = (self.pos_in_wave * TWO_PI).sin() * volume_scale;
+
+        self.pos_in_wave = (self.pos_in_wave + self.wave_delta_per_sample) % 1.0;
+        self.move_to_target_volume();
+
+        Some(value)
+    }
+}
+
+impl AudioShapeSynthesizer {
+    fn calculate_wave_delta_per_sample(sample_rate: usize, frequency: f64) -> f64 {
+        let samples_per_wave = sample_rate as f64 / frequency;
+        1.0 / samples_per_wave
     }
 
-    fn advance_pos_in_wave(&mut self, amount: f64) {
-        self.pos_in_wave = (self.pos_in_wave + amount) % 1.0;
+    fn new(target: AudioShape, sample_rate: usize) -> Self {
+        Self {
+            sample_rate,
+            pos_in_wave: 0.0,
+            volume: 0,
+            target,
+            wave_delta_per_sample: Self::calculate_wave_delta_per_sample(
+                sample_rate,
+                target.frequency,
+            ),
+        }
     }
 
-    fn move_to_volume(&mut self, target: u8) {
+    fn update_target(&mut self, target: AudioShape) {
+        self.target = target;
+        self.wave_delta_per_sample =
+            Self::calculate_wave_delta_per_sample(self.sample_rate, self.target.frequency);
+    }
+
+    fn move_to_target_volume(&mut self) {
+        let target = self.target.volume;
         if self.volume == target {
             return;
         }
@@ -39,10 +72,8 @@ impl AudioShapeState {
 
 pub struct Player {
     num_channels: u16,
-    sample_rate: usize,
     shape_mutex: Arc<Mutex<AudioShape>>,
-    shape: AudioShape,
-    shape_state: AudioShapeState,
+    synth: AudioShapeSynthesizer,
 }
 
 impl Player {
@@ -54,13 +85,8 @@ impl Player {
         let shape = *shape_mutex.lock().unwrap();
         let mut player = Player {
             num_channels: config.channels,
-            sample_rate: config.sample_rate.0 as usize,
             shape_mutex,
-            shape,
-            shape_state: AudioShapeState {
-                pos_in_wave: 0.0,
-                volume: 0,
-            },
+            synth: AudioShapeSynthesizer::new(shape, config.sample_rate.0 as usize),
         };
         let err_fn = |err| eprintln!("an error occurred on the output audio stream: {}", err);
         device
@@ -76,25 +102,21 @@ impl Player {
     /// running in an extremely time-sensitive audio thread.
     fn try_to_update_shape(&mut self) {
         if let Ok(shape) = self.shape_mutex.try_lock() {
-            self.shape = *shape
+            self.synth.update_target(*shape);
         }
     }
 
     fn write_audio<T: Sample>(&mut self, data: &mut [T], _: &cpal::OutputCallbackInfo) {
         self.try_to_update_shape();
-        let samples_per_wave = self.sample_rate as f64 / self.shape.frequency;
-        let wave_delta_per_sample = 1.0 / samples_per_wave;
 
         // We use chunks_mut() to access individual channels:
         // https://github.com/RustAudio/cpal/blob/master/examples/beep.rs#L127
         for sample in data.chunks_mut(self.num_channels as usize) {
-            let sample_value = Sample::from(&(self.shape_state.value() as f32));
+            let sample_value = Sample::from(&(self.synth.next().unwrap() as f32));
 
             for channel_sample in sample.iter_mut() {
                 *channel_sample = sample_value;
             }
-            self.shape_state.advance_pos_in_wave(wave_delta_per_sample);
-            self.shape_state.move_to_volume(self.shape.volume);
         }
     }
 }
