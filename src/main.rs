@@ -6,10 +6,12 @@ use std::time::Duration;
 
 mod note;
 mod player;
+mod synth;
 
 fn main() {
     use note::{MidiNote, MAJOR_SCALE, MINOR_HARMONIC_SCALE};
-    use player::{AudioShape, Player};
+    use player::Player;
+    use synth::AudioShape;
 
     let host = cpal::default_host();
     let device = host
