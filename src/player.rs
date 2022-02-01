@@ -16,6 +16,11 @@ struct AudioShapeState {
 }
 
 impl AudioShapeState {
+    fn value(&self) -> f64 {
+        let volume_scale = self.volume as f64 / std::u8::MAX as f64;
+        (self.pos_in_wave * TWO_PI).sin() * volume_scale
+    }
+
     fn advance_pos_in_wave(&mut self, amount: f64) {
         self.pos_in_wave = (self.pos_in_wave + amount) % 1.0;
     }
@@ -83,9 +88,7 @@ impl Player {
         // We use chunks_mut() to access individual channels:
         // https://github.com/RustAudio/cpal/blob/master/examples/beep.rs#L127
         for sample in data.chunks_mut(self.num_channels as usize) {
-            let volume_scale = self.shape_state.volume as f64 / std::u8::MAX as f64;
-            let value = ((self.shape_state.pos_in_wave * TWO_PI).sin() * volume_scale) as f32;
-            let sample_value = Sample::from(&value);
+            let sample_value = Sample::from(&(self.shape_state.value() as f32));
 
             for channel_sample in sample.iter_mut() {
                 *channel_sample = sample_value;
