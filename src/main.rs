@@ -20,7 +20,7 @@ struct Args {
 
 #[derive(Subcommand, Debug)]
 enum Commands {
-    /// Plays a scale (default C4).
+    /// Plays a scale (default C4 Major).
     Scale {
         note: Option<String>,
         #[clap(arg_enum)]
