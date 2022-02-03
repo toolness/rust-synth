@@ -27,6 +27,7 @@ struct Args {
 enum Commands {
     /// Plays a scale (default C4 Major).
     Scale {
+        /// e.g. C4, A#2, Bb5
         note: Option<String>,
         #[clap(arg_enum)]
         scale: Option<Scale>,
