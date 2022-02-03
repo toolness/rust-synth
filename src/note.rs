@@ -23,6 +23,10 @@ impl MidiNote {
         return A4_FREQUENCY * 2.0f64.powf(semitones_from_a4 as f64 / SEMITONES_PER_OCTAVE as f64);
     }
 
+    pub fn parse<T: AsRef<str>>(value: &T) -> Result<MidiNote, MidiNoteParseError> {
+        value.as_ref().try_into()
+    }
+
     fn try_from_chars(
         note: char,
         accidental: Option<char>,

@@ -1,3 +1,4 @@
+use clap::{AppSettings, Parser, Subcommand};
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::SampleFormat;
 use std::sync::{Arc, Mutex};
@@ -8,10 +9,42 @@ mod note;
 mod player;
 mod synth;
 
+#[derive(Parser, Debug)]
+#[clap(author, version, about, long_about = None)]
+#[clap(global_setting(AppSettings::PropagateVersion))]
+#[clap(global_setting(AppSettings::UseLongFormatForHelpSubcommand))]
+struct Args {
+    #[clap(subcommand)]
+    command: Commands,
+}
+
+#[derive(Subcommand, Debug)]
+enum Commands {
+    /// Plays a scale (default C4).
+    Scale { note: Option<String> },
+}
+
 fn main() {
     use note::{MidiNote, MAJOR_SCALE, MINOR_HARMONIC_SCALE};
     use player::Player;
     use synth::AudioShape;
+
+    let cli = Args::parse();
+    let tonic: MidiNote;
+    match &cli.command {
+        Commands::Scale { note } => {
+            if let Some(note_str) = note {
+                if let Ok(note) = MidiNote::parse(note_str) {
+                    tonic = note;
+                } else {
+                    println!("Unable to parse note '{}'!", note_str);
+                    std::process::exit(1);
+                }
+            } else {
+                tonic = "C4".try_into().unwrap()
+            }
+        }
+    }
 
     let host = cpal::default_host();
     let device = host
@@ -30,7 +63,6 @@ fn main() {
         supported_config
     );
     let config = supported_config.into();
-    let tonic: MidiNote = "C4".try_into().unwrap();
     let shape_mutex = Arc::new(Mutex::new(AudioShape {
         frequency: tonic.frequency(),
         volume: 255,
