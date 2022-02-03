@@ -10,6 +10,7 @@ mod note;
 mod player;
 mod synth;
 
+use note::{MidiNote, MAJOR_SCALE, MINOR_HARMONIC_SCALE};
 use player::Player;
 use synth::AudioShape;
 
@@ -63,36 +64,7 @@ fn build_stream(shape_mutex: Arc<Mutex<AudioShape>>) -> Stream {
     }
 }
 
-fn main() {
-    use note::{MidiNote, Semitones, MAJOR_SCALE, MINOR_HARMONIC_SCALE};
-
-    let cli = Args::parse();
-    let tonic: MidiNote;
-    let scale_semitones: Vec<Semitones>;
-    match &cli.command {
-        Commands::Scale { note, scale } => {
-            if let Some(note_str) = note {
-                if let Ok(note) = MidiNote::parse(note_str) {
-                    tonic = note;
-                } else {
-                    println!("Unable to parse note '{}'!", note_str);
-                    std::process::exit(1);
-                }
-            } else {
-                tonic = "C4".try_into().unwrap()
-            }
-            let base_scale = match scale.unwrap_or(Scale::Major) {
-                Scale::Major => MAJOR_SCALE,
-                Scale::MinorHarmonic => MINOR_HARMONIC_SCALE,
-            };
-            scale_semitones = base_scale
-                .iter()
-                .copied()
-                .chain(base_scale.iter().rev().map(|s| -s))
-                .collect();
-        }
-    }
-
+fn play_scale(tonic: MidiNote, scale: Scale) {
     let shape_mutex = Arc::new(Mutex::new(AudioShape {
         frequency: tonic.frequency(),
         volume: 255,
@@ -103,7 +75,16 @@ fn main() {
     let one_beat = Duration::from_millis(500);
     let mut note: MidiNote = tonic;
 
-    for semitones in scale_semitones {
+    let base_scale = match scale {
+        Scale::Major => MAJOR_SCALE,
+        Scale::MinorHarmonic => MINOR_HARMONIC_SCALE,
+    };
+
+    for semitones in base_scale
+        .iter()
+        .copied()
+        .chain(base_scale.iter().rev().map(|s| -s))
+    {
         thread::sleep(one_beat);
         note += semitones;
         shape_mutex.lock().unwrap().frequency = note.frequency();
@@ -114,6 +95,23 @@ fn main() {
     // Avoid popping.
     shape_mutex.lock().unwrap().volume = 0;
     thread::sleep(Duration::from_millis(250));
+}
 
-    println!("Bye!");
+fn main() {
+    let cli = Args::parse();
+    match &cli.command {
+        Commands::Scale { note, scale } => {
+            let tonic: MidiNote = if let Some(note_str) = note {
+                if let Ok(note) = MidiNote::parse(note_str) {
+                    note
+                } else {
+                    println!("Unable to parse note '{}'!", note_str);
+                    std::process::exit(1);
+                }
+            } else {
+                "C4".try_into().unwrap()
+            };
+            play_scale(tonic, scale.unwrap_or(Scale::Major));
+        }
+    }
 }
