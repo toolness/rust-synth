@@ -11,7 +11,7 @@ mod player;
 mod synth;
 mod tracks;
 
-use note::{MidiNote, MAJOR_SCALE, MINOR_HARMONIC_SCALE};
+use note::{MidiNote, MAJOR_SCALE, MINOR_HARMONIC_SCALE, OCTAVE};
 use player::Player;
 use synth::AudioShape;
 
@@ -41,7 +41,7 @@ enum Scale {
     MinorHarmonic,
 }
 
-fn build_stream(shape_mutex: Arc<Mutex<[AudioShape]>>) -> Stream {
+fn build_stream(shapes_mutex: Arc<Mutex<[AudioShape]>>) -> Stream {
     let host = cpal::default_host();
     let device = host
         .default_output_device()
@@ -60,18 +60,24 @@ fn build_stream(shape_mutex: Arc<Mutex<[AudioShape]>>) -> Stream {
     );
     let config = supported_config.into();
     match sample_format {
-        SampleFormat::F32 => Player::get_stream::<f32>(device, &config, shape_mutex),
-        SampleFormat::I16 => Player::get_stream::<i16>(device, &config, shape_mutex),
-        SampleFormat::U16 => Player::get_stream::<u16>(device, &config, shape_mutex),
+        SampleFormat::F32 => Player::get_stream::<f32>(device, &config, shapes_mutex),
+        SampleFormat::I16 => Player::get_stream::<i16>(device, &config, shapes_mutex),
+        SampleFormat::U16 => Player::get_stream::<u16>(device, &config, shapes_mutex),
     }
 }
 
 fn play_scale(tonic: MidiNote, scale: Scale) {
-    let shape_mutex = Arc::new(Mutex::new([AudioShape {
-        frequency: tonic.frequency(),
-        volume: 255,
-    }]));
-    let stream = build_stream(shape_mutex.clone());
+    let shapes_mutex = Arc::new(Mutex::new([
+        AudioShape {
+            frequency: tonic.frequency(),
+            volume: 128,
+        },
+        AudioShape {
+            frequency: (tonic - OCTAVE).frequency(),
+            volume: 32,
+        },
+    ]));
+    let stream = build_stream(shapes_mutex.clone());
     stream.play().unwrap();
 
     let one_beat = Duration::from_millis(500);
@@ -89,13 +95,17 @@ fn play_scale(tonic: MidiNote, scale: Scale) {
     {
         thread::sleep(one_beat);
         note += semitones;
-        shape_mutex.lock().unwrap()[0].frequency = note.frequency();
+        let mut shapes = shapes_mutex.lock().unwrap();
+        shapes[0].frequency = note.frequency();
+        shapes[1].frequency = (note - OCTAVE).frequency();
     }
 
     thread::sleep(one_beat);
 
     // Avoid popping.
-    shape_mutex.lock().unwrap()[0].volume = 0;
+    let mut shapes = shapes_mutex.lock().unwrap();
+    shapes[0].volume = 0;
+    shapes[1].volume = 0;
     thread::sleep(Duration::from_millis(250));
 }
 
