@@ -76,7 +76,7 @@ fn play_scale(tonic: MidiNote, scale: Scale, bpm: u64) {
         },
         AudioShape {
             frequency: (tonic - OCTAVE).frequency(),
-            volume: 32,
+            volume: 0,
         },
     ]));
     let stream = build_stream(shapes_mutex.clone());
