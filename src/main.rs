@@ -9,6 +9,7 @@ use std::time::Duration;
 mod note;
 mod player;
 mod synth;
+mod tracks;
 
 use note::{MidiNote, MAJOR_SCALE, MINOR_HARMONIC_SCALE};
 use player::Player;
@@ -40,7 +41,7 @@ enum Scale {
     MinorHarmonic,
 }
 
-fn build_stream(shape_mutex: Arc<Mutex<AudioShape>>) -> Stream {
+fn build_stream(shape_mutex: Arc<Mutex<[AudioShape]>>) -> Stream {
     let host = cpal::default_host();
     let device = host
         .default_output_device()
@@ -66,10 +67,10 @@ fn build_stream(shape_mutex: Arc<Mutex<AudioShape>>) -> Stream {
 }
 
 fn play_scale(tonic: MidiNote, scale: Scale) {
-    let shape_mutex = Arc::new(Mutex::new(AudioShape {
+    let shape_mutex = Arc::new(Mutex::new([AudioShape {
         frequency: tonic.frequency(),
         volume: 255,
-    }));
+    }]));
     let stream = build_stream(shape_mutex.clone());
     stream.play().unwrap();
 
@@ -88,13 +89,13 @@ fn play_scale(tonic: MidiNote, scale: Scale) {
     {
         thread::sleep(one_beat);
         note += semitones;
-        shape_mutex.lock().unwrap().frequency = note.frequency();
+        shape_mutex.lock().unwrap()[0].frequency = note.frequency();
     }
 
     thread::sleep(one_beat);
 
     // Avoid popping.
-    shape_mutex.lock().unwrap().volume = 0;
+    shape_mutex.lock().unwrap()[0].volume = 0;
     thread::sleep(Duration::from_millis(250));
 }
 
