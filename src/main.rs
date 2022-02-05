@@ -1,11 +1,11 @@
+use beat::{Beat, BeatCounter, TimeSignature};
 use clap::{AppSettings, ArgEnum, Parser, Subcommand};
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::SampleFormat;
 use cpal::Stream;
 use std::sync::{Arc, Mutex};
-use std::thread;
-use std::time::Duration;
 
+mod beat;
 mod note;
 mod player;
 mod synth;
@@ -32,6 +32,8 @@ enum Commands {
         note: Option<String>,
         #[clap(arg_enum)]
         scale: Option<Scale>,
+        /// Beats per minute (default 60).
+        bpm: Option<u64>,
     },
 }
 
@@ -66,7 +68,7 @@ fn build_stream(shapes_mutex: Arc<Mutex<[AudioShape]>>) -> Stream {
     }
 }
 
-fn play_scale(tonic: MidiNote, scale: Scale) {
+fn play_scale(tonic: MidiNote, scale: Scale, bpm: u64) {
     let shapes_mutex = Arc::new(Mutex::new([
         AudioShape {
             frequency: tonic.frequency(),
@@ -80,7 +82,10 @@ fn play_scale(tonic: MidiNote, scale: Scale) {
     let stream = build_stream(shapes_mutex.clone());
     stream.play().unwrap();
 
-    let one_beat = Duration::from_millis(500);
+    let beat_counter = BeatCounter {
+        bpm,
+        time_signature: TimeSignature(4, Beat::Quarter),
+    };
     let mut note: MidiNote = tonic;
 
     let base_scale = match scale {
@@ -93,26 +98,29 @@ fn play_scale(tonic: MidiNote, scale: Scale) {
         .copied()
         .chain(base_scale.iter().rev().map(|s| -s))
     {
-        thread::sleep(one_beat);
+        beat_counter.sleep(Beat::Quarter);
         note += semitones;
         let mut shapes = shapes_mutex.lock().unwrap();
-        shapes[0].frequency = note.frequency();
-        shapes[1].frequency = (note - OCTAVE).frequency();
+        let mut curr_shape_note = note;
+        for shape in shapes.iter_mut() {
+            shape.frequency = curr_shape_note.frequency();
+            curr_shape_note = curr_shape_note - OCTAVE;
+        }
     }
 
-    thread::sleep(one_beat);
+    beat_counter.sleep(Beat::Quarter);
 
     // Avoid popping.
-    let mut shapes = shapes_mutex.lock().unwrap();
-    shapes[0].volume = 0;
-    shapes[1].volume = 0;
-    thread::sleep(Duration::from_millis(250));
+    shapes_mutex.lock().unwrap().iter_mut().for_each(|shape| {
+        shape.volume = 0;
+    });
+    beat_counter.sleep(Beat::Sixteenth);
 }
 
 fn main() {
     let cli = Args::parse();
     match &cli.command {
-        Commands::Scale { note, scale } => {
+        Commands::Scale { note, scale, bpm } => {
             let tonic: MidiNote = if let Some(note_str) = note {
                 if let Ok(note) = MidiNote::parse(note_str) {
                     note
@@ -123,7 +131,7 @@ fn main() {
             } else {
                 "C4".try_into().unwrap()
             };
-            play_scale(tonic, scale.unwrap_or(Scale::Major));
+            play_scale(tonic, scale.unwrap_or(Scale::Major), bpm.unwrap_or(60));
         }
     }
 }
