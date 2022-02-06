@@ -4,13 +4,14 @@ use std::cell::RefCell;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::mpsc::{sync_channel, Receiver, SyncSender};
-use std::task::{Context, Poll};
+use std::task::Context;
 use std::thread::sleep;
 use std::time::Duration;
 
 use crate::dummy_waker::dummy_waker;
 use crate::synth::{AudioShape, AudioShapeSynthesizer};
 use crate::synth_registry::SynthRegistry;
+use crate::waiter::Waiter;
 
 pub type PlayerProgram = Pin<Box<dyn Future<Output = ()> + Send>>;
 
@@ -75,22 +76,6 @@ impl Drop for AudioShapeProxy {
     }
 }
 
-struct Waiter {
-    end: f64,
-}
-
-impl Future for Waiter {
-    type Output = ();
-
-    fn poll(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<()> {
-        if get_current_time() >= self.end {
-            Poll::Ready(())
-        } else {
-            Poll::Pending
-        }
-    }
-}
-
 impl Player {
     pub fn get_stream<T: Sample>(
         device: Device,
@@ -118,9 +103,7 @@ impl Player {
     }
 
     pub fn wait(ms: f64) -> impl Future<Output = ()> {
-        return Waiter {
-            end: get_current_time() + ms,
-        };
+        Waiter::new(ms, get_current_time)
     }
 
     pub fn new_shape(shape: AudioShape) -> AudioShapeProxy {

@@ -9,6 +9,7 @@ mod note;
 mod player;
 mod synth;
 mod synth_registry;
+mod waiter;
 
 use note::{MidiNote, MAJOR_SCALE, MINOR_HARMONIC_SCALE, OCTAVE};
 use player::{Player, PlayerProgram, PlayerProxy};
