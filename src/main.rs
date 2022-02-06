@@ -9,7 +9,7 @@ mod note;
 mod player;
 mod synth;
 
-use note::{MidiNote, MAJOR_SCALE, MINOR_HARMONIC_SCALE};
+use note::{MidiNote, MAJOR_SCALE, MINOR_HARMONIC_SCALE, OCTAVE};
 use player::{Player, PlayerProgram, PlayerProxy};
 use synth::AudioShape;
 
@@ -32,6 +32,9 @@ enum Commands {
         scale: Option<Scale>,
         /// Beats per minute (default 60).
         bpm: Option<u64>,
+        #[clap(long)]
+        /// Play two scales, the second an octave above the first.
+        octaves: bool,
     },
     /// Plays a siren sound.
     Siren {},
@@ -82,7 +85,14 @@ async fn siren_program() {
     }
 }
 
-async fn scale_program(tonic: MidiNote, scale: Scale, bpm: u64) {
+async fn scale_program(tonic: MidiNote, scale: Scale, bpm: u64, octaves: bool) {
+    if octaves {
+        Player::start_program(Box::pin(play_scale(tonic + OCTAVE, scale, bpm)));
+    }
+    play_scale(tonic, scale, bpm).await;
+}
+
+async fn play_scale(tonic: MidiNote, scale: Scale, bpm: u64) {
     let beat_counter = BeatCounter {
         bpm,
         time_signature: TimeSignature(4, Beat::Quarter),
@@ -90,7 +100,7 @@ async fn scale_program(tonic: MidiNote, scale: Scale, bpm: u64) {
     let mut note: MidiNote = tonic;
     let mut shape = Player::new_shape(AudioShape {
         frequency: note.frequency(),
-        volume: 128,
+        volume: 127,
     });
 
     let base_scale = match scale {
@@ -123,7 +133,12 @@ fn main() {
             player.stream.play().unwrap();
             player.wait_until_finished();
         }
-        Commands::Scale { note, scale, bpm } => {
+        Commands::Scale {
+            note,
+            scale,
+            bpm,
+            octaves,
+        } => {
             let tonic: MidiNote = if let Some(note_str) = note {
                 if let Ok(note) = MidiNote::parse(note_str) {
                     note
@@ -138,6 +153,7 @@ fn main() {
                 tonic,
                 scale.unwrap_or(Scale::Major),
                 bpm.unwrap_or(60),
+                *octaves,
             )));
             player.stream.play().unwrap();
             player.wait_until_finished();

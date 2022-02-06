@@ -50,6 +50,7 @@ thread_local! {
     static CURRENT_SAMPLE_RATE: RefCell<Option<usize>> = RefCell::new(None);
     static CURRENT_TIME: RefCell<f64> = RefCell::new(0.0);
     static CURRENT_SYNTHS: RefCell<SynthRegistry> = RefCell::new(SynthRegistry::new());
+    static NEW_PROGRAMS: RefCell<Vec<PlayerProgram>> = RefCell::new(vec![]);
 }
 
 fn get_current_time() -> f64 {
@@ -166,6 +167,21 @@ impl Player {
         AudioShapeProxy { id }
     }
 
+    pub fn start_program(program: PlayerProgram) {
+        NEW_PROGRAMS.with(|programs| {
+            programs.borrow_mut().push(program);
+        });
+    }
+
+    fn process_new_programs(&mut self) {
+        NEW_PROGRAMS.with(|programs| {
+            let mut mut_programs = programs.borrow_mut();
+            while let Some(program) = mut_programs.pop() {
+                self.programs.push(program);
+            }
+        });
+    }
+
     fn run_programs(&mut self) {
         if self.program_finished {
             return;
@@ -183,6 +199,7 @@ impl Player {
                     i += 1;
                 }
             }
+            self.process_new_programs();
         }
         if self.programs.len() == 0 {
             if let Ok(_) = self.sender.send(()) {
