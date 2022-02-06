@@ -30,6 +30,7 @@ enum Commands {
         note: Option<String>,
         #[clap(arg_enum)]
         scale: Option<Scale>,
+        #[clap(long)]
         /// Beats per minute (default 60).
         bpm: Option<u64>,
         #[clap(long)]
