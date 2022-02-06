@@ -2,7 +2,6 @@ use beat::{Beat, BeatCounter, TimeSignature};
 use clap::{AppSettings, ArgEnum, Parser, Subcommand};
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::SampleFormat;
-use cpal::Stream;
 use std::sync::{Arc, Mutex};
 
 mod beat;
@@ -13,7 +12,7 @@ mod synth;
 mod tracks;
 
 use note::{MidiNote, MAJOR_SCALE, MINOR_HARMONIC_SCALE, OCTAVE};
-use player::{Player, PlayerProgram};
+use player::{Player, PlayerProgram, PlayerProxy};
 use synth::AudioShape;
 
 #[derive(Parser, Debug)]
@@ -36,6 +35,7 @@ enum Commands {
         /// Beats per minute (default 60).
         bpm: Option<u64>,
     },
+    Siren {},
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, ArgEnum)]
@@ -44,21 +44,7 @@ enum Scale {
     MinorHarmonic,
 }
 
-async fn program() {
-    loop {
-        Player::wait(500.0).await;
-        let mut shape = Player::new_shape(AudioShape {
-            frequency: 440.0,
-            volume: 128,
-        });
-        Player::wait(500.0).await;
-        shape.set_frequency(400.0);
-        Player::wait(250.0).await;
-        shape.finish().await;
-    }
-}
-
-fn build_stream(shapes_mutex: Arc<Mutex<[AudioShape]>>, program: PlayerProgram) -> Stream {
+fn build_stream(shapes_mutex: Arc<Mutex<[AudioShape]>>, program: PlayerProgram) -> PlayerProxy {
     let host = cpal::default_host();
     let device = host
         .default_output_device()
@@ -83,19 +69,45 @@ fn build_stream(shapes_mutex: Arc<Mutex<[AudioShape]>>, program: PlayerProgram) 
     }
 }
 
+async fn noop_program() {}
+
+async fn siren_program() {
+    for _ in 0..5 {
+        Player::wait(500.0).await;
+        let mut shape = Player::new_shape(AudioShape {
+            frequency: 440.0,
+            volume: 128,
+        });
+        Player::wait(500.0).await;
+        shape.set_frequency(400.0);
+        Player::wait(250.0).await;
+        shape.finish().await;
+    }
+}
+
+fn play_siren() {
+    let shapes_mutex = Arc::new(Mutex::new([AudioShape {
+        frequency: 440.0,
+        volume: 0,
+    }]));
+    let mut player = build_stream(shapes_mutex.clone(), Box::pin(siren_program()));
+    player.stream.play().unwrap();
+    player.wait_until_finished();
+}
+
 fn play_scale(tonic: MidiNote, scale: Scale, bpm: u64) {
     let shapes_mutex = Arc::new(Mutex::new([
         AudioShape {
             frequency: tonic.frequency(),
-            volume: 0,
+            volume: 128,
         },
         AudioShape {
             frequency: (tonic - OCTAVE).frequency(),
             volume: 0,
         },
     ]));
-    let stream = build_stream(shapes_mutex.clone(), Box::pin(program()));
-    stream.play().unwrap();
+    let player = build_stream(shapes_mutex.clone(), Box::pin(noop_program()));
+    player.stream.play().unwrap();
 
     let beat_counter = BeatCounter {
         bpm,
@@ -135,6 +147,9 @@ fn play_scale(tonic: MidiNote, scale: Scale, bpm: u64) {
 fn main() {
     let cli = Args::parse();
     match &cli.command {
+        Commands::Siren {} => {
+            play_siren();
+        }
         Commands::Scale { note, scale, bpm } => {
             let tonic: MidiNote = if let Some(note_str) = note {
                 if let Ok(note) = MidiNote::parse(note_str) {

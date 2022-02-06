@@ -4,6 +4,7 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::future::Future;
 use std::pin::Pin;
+use std::sync::mpsc::{sync_channel, Receiver, SyncSender};
 use std::sync::{Arc, Mutex};
 use std::task::{Context, Poll};
 
@@ -27,12 +28,25 @@ impl SynthRegistry {
     }
 }
 
+pub struct PlayerProxy {
+    pub stream: Stream,
+    receiver: Receiver<()>,
+}
+
+impl PlayerProxy {
+    pub fn wait_until_finished(&mut self) {
+        self.receiver.recv().unwrap();
+    }
+}
+
 pub struct Player {
     num_channels: u16,
     sample_rate: usize,
     tracks: Tracks,
     program: PlayerProgram,
     latest_instant: Option<StreamInstant>,
+    sender: SyncSender<()>,
+    program_finished: bool,
 }
 
 thread_local! {
@@ -82,7 +96,7 @@ impl AudioShapeProxy {
 
     pub async fn finish(mut self) {
         self.set_volume(0);
-        Player::wait(50.0).await;
+        Player::wait(250.0).await;
     }
 }
 
@@ -116,7 +130,8 @@ impl Player {
         config: &StreamConfig,
         shape_mutex: Arc<Mutex<[AudioShape]>>,
         program: PlayerProgram,
-    ) -> Stream {
+    ) -> PlayerProxy {
+        let (sender, receiver) = sync_channel(1);
         let tracks = Tracks::new(shape_mutex, config.sample_rate.0 as usize);
         let mut player = Player {
             num_channels: config.channels,
@@ -124,15 +139,18 @@ impl Player {
             program,
             latest_instant: None,
             sample_rate: config.sample_rate.0 as usize,
+            sender,
+            program_finished: false,
         };
         let err_fn = |err| eprintln!("an error occurred on the output audio stream: {}", err);
-        device
+        let stream = device
             .build_output_stream(
                 config,
                 move |data, cpal| player.write_audio::<T>(data, cpal),
                 err_fn,
             )
-            .unwrap()
+            .unwrap();
+        return PlayerProxy { stream, receiver };
     }
 
     pub fn wait(ms: f64) -> impl Future<Output = ()> {
@@ -155,10 +173,16 @@ impl Player {
     }
 
     fn run_program(&mut self) {
+        if self.program_finished {
+            return;
+        }
         let waker = dummy_waker();
         let mut context = Context::from_waker(&waker);
         match self.program.as_mut().poll(&mut context) {
-            std::task::Poll::Ready(_) => {}
+            std::task::Poll::Ready(_) => {
+                self.program_finished = true;
+                if let Ok(_) = self.sender.send(()) {}
+            }
             std::task::Poll::Pending => {}
         }
     }
