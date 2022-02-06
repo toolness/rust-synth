@@ -40,7 +40,7 @@ impl PlayerProxy {
 pub struct Player {
     num_channels: u16,
     sample_rate: usize,
-    program: PlayerProgram,
+    programs: Vec<PlayerProgram>,
     latest_instant: Option<StreamInstant>,
     sender: SyncSender<()>,
     program_finished: bool,
@@ -130,7 +130,7 @@ impl Player {
         let (sender, receiver) = sync_channel(1);
         let mut player = Player {
             num_channels: config.channels,
-            program,
+            programs: vec![program],
             latest_instant: None,
             sample_rate: config.sample_rate.0 as usize,
             sender,
@@ -166,18 +166,28 @@ impl Player {
         AudioShapeProxy { id }
     }
 
-    fn run_program(&mut self) {
+    fn run_programs(&mut self) {
         if self.program_finished {
             return;
         }
         let waker = dummy_waker();
         let mut context = Context::from_waker(&waker);
-        match self.program.as_mut().poll(&mut context) {
-            std::task::Poll::Ready(_) => {
-                self.program_finished = true;
-                if let Ok(_) = self.sender.send(()) {}
+        let mut i = 0;
+        while i < self.programs.len() {
+            let program = self.programs.get_mut(i).unwrap();
+            match program.as_mut().poll(&mut context) {
+                std::task::Poll::Ready(_) => {
+                    self.programs.remove(i);
+                }
+                std::task::Poll::Pending => {
+                    i += 1;
+                }
             }
-            std::task::Poll::Pending => {}
+        }
+        if self.programs.len() == 0 {
+            if let Ok(_) = self.sender.send(()) {
+                self.program_finished = true;
+            }
         }
     }
 
@@ -185,10 +195,11 @@ impl Player {
         let latest_instant = info.timestamp().playback;
         if let Some(previous_instant) = self.latest_instant {
             CURRENT_TIME.with(|value| {
-                *value.borrow_mut() += latest_instant
-                    .duration_since(&previous_instant)
-                    .unwrap()
-                    .as_millis() as f64;
+                // Bizzarely, the latest instant can sometimes be *before* our
+                // previous one, so we need to check here.
+                if let Some(duration) = latest_instant.duration_since(&previous_instant) {
+                    *value.borrow_mut() += duration.as_millis() as f64;
+                }
             });
         } else {
             CURRENT_SAMPLE_RATE.with(|value| {
@@ -197,7 +208,7 @@ impl Player {
         }
         self.latest_instant = Some(latest_instant);
 
-        self.run_program();
+        self.run_programs();
 
         CURRENT_SYNTHS.with(|registry| {
             let mut mut_registry = registry.borrow_mut();
