@@ -12,7 +12,7 @@ mod synth;
 mod tracks;
 
 use note::{MidiNote, MAJOR_SCALE, MINOR_HARMONIC_SCALE, OCTAVE};
-use player::Player;
+use player::{Player, PlayerProgram};
 use synth::AudioShape;
 
 #[derive(Parser, Debug)]
@@ -43,7 +43,15 @@ enum Scale {
     MinorHarmonic,
 }
 
-fn build_stream(shapes_mutex: Arc<Mutex<[AudioShape]>>) -> Stream {
+async fn program() {
+    println!("PROGRAM");
+    loop {
+        Player::wait(5).await;
+        println!("PROGRAM!!");
+    }
+}
+
+fn build_stream(shapes_mutex: Arc<Mutex<[AudioShape]>>, program: PlayerProgram) -> Stream {
     let host = cpal::default_host();
     let device = host
         .default_output_device()
@@ -62,9 +70,9 @@ fn build_stream(shapes_mutex: Arc<Mutex<[AudioShape]>>) -> Stream {
     );
     let config = supported_config.into();
     match sample_format {
-        SampleFormat::F32 => Player::get_stream::<f32>(device, &config, shapes_mutex),
-        SampleFormat::I16 => Player::get_stream::<i16>(device, &config, shapes_mutex),
-        SampleFormat::U16 => Player::get_stream::<u16>(device, &config, shapes_mutex),
+        SampleFormat::F32 => Player::get_stream::<f32>(device, &config, shapes_mutex, program),
+        SampleFormat::I16 => Player::get_stream::<i16>(device, &config, shapes_mutex, program),
+        SampleFormat::U16 => Player::get_stream::<u16>(device, &config, shapes_mutex, program),
     }
 }
 
@@ -79,7 +87,7 @@ fn play_scale(tonic: MidiNote, scale: Scale, bpm: u64) {
             volume: 0,
         },
     ]));
-    let stream = build_stream(shapes_mutex.clone());
+    let stream = build_stream(shapes_mutex.clone(), Box::pin(program()));
     stream.play().unwrap();
 
     let beat_counter = BeatCounter {
