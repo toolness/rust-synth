@@ -43,7 +43,7 @@ pub struct Player {
     programs: Vec<PlayerProgram>,
     latest_instant: Option<StreamInstant>,
     sender: SyncSender<()>,
-    program_finished: bool,
+    programs_finished: bool,
 }
 
 thread_local! {
@@ -135,7 +135,7 @@ impl Player {
             latest_instant: None,
             sample_rate: config.sample_rate.0 as usize,
             sender,
-            program_finished: false,
+            programs_finished: false,
         };
         let err_fn = |err| eprintln!("an error occurred on the output audio stream: {}", err);
         let stream = device
@@ -183,7 +183,7 @@ impl Player {
     }
 
     fn run_programs(&mut self) {
-        if self.program_finished {
+        if self.programs_finished {
             return;
         }
         let waker = dummy_waker();
@@ -203,7 +203,7 @@ impl Player {
         }
         if self.programs.len() == 0 {
             if let Ok(_) = self.sender.send(()) {
-                self.program_finished = true;
+                self.programs_finished = true;
             }
         }
     }
