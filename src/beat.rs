@@ -1,5 +1,3 @@
-use std::time::Duration;
-
 #[derive(Debug, Copy, Clone)]
 #[allow(dead_code)]
 pub enum Beat {
@@ -47,9 +45,9 @@ impl BeatCounter {
         beat_unit_divisor as f64 / length_divisor as f64
     }
 
-    pub fn duration(&self, length: Beat) -> Duration {
+    pub fn duration_in_millis(&self, length: Beat) -> f64 {
         let beats_per_second = 60.0 / self.bpm as f64;
         let ms_per_beat = beats_per_second * 1000.0;
-        Duration::from_millis((ms_per_beat * self.beats(length)) as u64)
+        ms_per_beat * self.beats(length)
     }
 }

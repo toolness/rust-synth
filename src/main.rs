@@ -98,7 +98,7 @@ async fn scale_program(tonic: MidiNote, scale: Scale, bpm: u64) {
         Scale::MinorHarmonic => MINOR_HARMONIC_SCALE,
     };
 
-    let ms_per_quarter_note = beat_counter.duration(Beat::Quarter).as_millis() as f64;
+    let ms_per_quarter_note = beat_counter.duration_in_millis(Beat::Quarter);
 
     for semitones in base_scale
         .iter()
