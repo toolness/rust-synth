@@ -148,7 +148,7 @@ impl Player {
         });
     }
 
-    fn run_programs(&mut self) {
+    fn execute_programs(&mut self) {
         let waker = dummy_waker();
         let mut context = Context::from_waker(&waker);
         let mut i = 0;
@@ -183,7 +183,7 @@ impl Player {
         }
         self.latest_instant = Some(latest_instant);
 
-        self.run_programs();
+        self.execute_programs();
 
         CURRENT_SYNTHS.with(|registry| {
             let mut mut_registry = registry.borrow_mut();
