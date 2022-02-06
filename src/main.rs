@@ -6,6 +6,7 @@ use cpal::Stream;
 use std::sync::{Arc, Mutex};
 
 mod beat;
+mod dummy_waker;
 mod note;
 mod player;
 mod synth;

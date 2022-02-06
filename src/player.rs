@@ -5,8 +5,8 @@ use std::future::Future;
 use std::pin::Pin;
 use std::sync::{Arc, Mutex};
 use std::task::{Context, Poll};
-use waker_fn::waker_fn;
 
+use crate::dummy_waker::dummy_waker;
 use crate::synth::AudioShape;
 use crate::tracks::Tracks;
 
@@ -72,7 +72,7 @@ impl Player {
     }
 
     fn run_program(&mut self) {
-        let waker = waker_fn(|| {});
+        let waker = dummy_waker();
         let mut context = Context::from_waker(&waker);
         match self.program.as_mut().poll(&mut context) {
             std::task::Poll::Ready(value) => {
