@@ -1,7 +1,6 @@
 use cpal::traits::DeviceTrait;
 use cpal::{Device, Sample, Stream, StreamConfig, StreamInstant};
 use std::cell::RefCell;
-use std::collections::HashMap;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::mpsc::{sync_channel, Receiver, SyncSender};
@@ -11,28 +10,9 @@ use std::time::Duration;
 
 use crate::dummy_waker::dummy_waker;
 use crate::synth::{AudioShape, AudioShapeSynthesizer};
+use crate::synth_registry::SynthRegistry;
 
 pub type PlayerProgram = Pin<Box<dyn Future<Output = ()> + Send>>;
-
-pub struct SynthRegistry {
-    latest_id: usize,
-    map: HashMap<usize, AudioShapeSynthesizer>,
-}
-
-impl SynthRegistry {
-    pub fn new() -> Self {
-        Self {
-            latest_id: 0,
-            map: HashMap::new(),
-        }
-    }
-
-    pub fn remove_finished_synths(&mut self) {
-        self.map.retain(|_id, synth| {
-            return !synth.has_finished_playing();
-        });
-    }
-}
 
 pub struct PlayerProxy {
     pub stream: Stream,
@@ -75,16 +55,12 @@ pub struct AudioShapeProxy {
 impl AudioShapeProxy {
     pub fn set_frequency(&mut self, frequency: f64) {
         CURRENT_SYNTHS.with(|registry| {
-            registry
-                .borrow_mut()
-                .map
-                .entry(self.id)
-                .and_modify(|synth| {
-                    synth.update_target(AudioShape {
-                        frequency,
-                        ..synth.get_target()
-                    })
-                });
+            registry.borrow_mut().modify(self.id, |synth| {
+                synth.update_target(AudioShape {
+                    frequency,
+                    ..synth.get_target()
+                })
+            });
         })
     }
 }
@@ -92,13 +68,9 @@ impl AudioShapeProxy {
 impl Drop for AudioShapeProxy {
     fn drop(&mut self) {
         CURRENT_SYNTHS.with(|registry| {
-            registry
-                .borrow_mut()
-                .map
-                .entry(self.id)
-                .and_modify(|synth| {
-                    synth.make_inactive();
-                });
+            registry.borrow_mut().modify(self.id, |synth| {
+                synth.make_inactive();
+            });
         })
     }
 }
@@ -156,10 +128,7 @@ impl Player {
         let id = CURRENT_SYNTHS.with(|registry| {
             let mut mut_registry = registry.borrow_mut();
             let synth = AudioShapeSynthesizer::new(shape, sample_rate);
-            mut_registry.latest_id += 1;
-            let id = mut_registry.latest_id;
-            mut_registry.map.insert(id, synth);
-            return id;
+            return mut_registry.insert(synth);
         });
         AudioShapeProxy { id }
     }
@@ -222,10 +191,7 @@ impl Player {
             // We use chunks_mut() to access individual channels:
             // https://github.com/RustAudio/cpal/blob/master/examples/beep.rs#L127
             for sample in data.chunks_mut(self.num_channels as usize) {
-                let mut value = 0.0;
-                for (_id, synth) in mut_registry.map.iter_mut() {
-                    value += synth.next().unwrap();
-                }
+                let value = mut_registry.next_sample();
                 let sample_value = Sample::from(&(value as f32));
 
                 for channel_sample in sample.iter_mut() {
@@ -235,8 +201,7 @@ impl Player {
 
             mut_registry.remove_finished_synths();
 
-            if mut_registry.map.is_empty() && self.programs.len() == 0 && !self.sent_finished_signal
-            {
+            if mut_registry.is_empty() && self.programs.len() == 0 && !self.sent_finished_signal {
                 if let Ok(_) = self.sender.send(()) {
                     self.sent_finished_signal = true;
                 }

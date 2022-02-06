@@ -8,6 +8,7 @@ mod dummy_waker;
 mod note;
 mod player;
 mod synth;
+mod synth_registry;
 
 use note::{MidiNote, MAJOR_SCALE, MINOR_HARMONIC_SCALE, OCTAVE};
 use player::{Player, PlayerProgram, PlayerProxy};
