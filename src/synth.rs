@@ -11,6 +11,7 @@ pub struct AudioShapeSynthesizer {
     pos_in_wave: f64,
     volume: u8,
     wave_delta_per_sample: f64,
+    is_active: bool,
     target: AudioShape,
 }
 
@@ -44,7 +45,17 @@ impl AudioShapeSynthesizer {
                 sample_rate,
                 target.frequency,
             ),
+            is_active: true,
         }
+    }
+
+    pub fn make_inactive(&mut self) {
+        self.is_active = false;
+        self.target.volume = 0;
+    }
+
+    pub fn has_finished_playing(&self) -> bool {
+        !self.is_active && self.volume == 0
     }
 
     pub fn get_target(&self) -> AudioShape {

@@ -81,7 +81,6 @@ async fn siren_program() {
         Player::wait(500.0).await;
         shape.set_frequency(400.0);
         Player::wait(250.0).await;
-        shape.finish().await;
     }
 }
 
@@ -121,8 +120,6 @@ async fn play_scale(tonic: MidiNote, scale: Scale, bpm: u64) {
     }
 
     Player::wait(ms_per_quarter_note).await;
-
-    shape.finish().await;
 }
 
 fn main() {

@@ -6,6 +6,8 @@ use std::future::Future;
 use std::pin::Pin;
 use std::sync::mpsc::{sync_channel, Receiver, SyncSender};
 use std::task::{Context, Poll};
+use std::thread::sleep;
+use std::time::Duration;
 
 use crate::dummy_waker::dummy_waker;
 use crate::synth::{AudioShape, AudioShapeSynthesizer};
@@ -24,6 +26,12 @@ impl SynthRegistry {
             map: HashMap::new(),
         }
     }
+
+    pub fn remove_finished_synths(&mut self) {
+        self.map.retain(|_id, synth| {
+            return !synth.has_finished_playing();
+        });
+    }
 }
 
 pub struct PlayerProxy {
@@ -34,6 +42,9 @@ pub struct PlayerProxy {
 impl PlayerProxy {
     pub fn wait_until_finished(&mut self) {
         self.receiver.recv().unwrap();
+        // The audio thread has finished generating audio, but it may still
+        // need to be played, so give a bit of time for that.
+        sleep(Duration::from_millis(250));
     }
 }
 
@@ -43,7 +54,7 @@ pub struct Player {
     programs: Vec<PlayerProgram>,
     latest_instant: Option<StreamInstant>,
     sender: SyncSender<()>,
-    programs_finished: bool,
+    sent_finished_signal: bool,
 }
 
 thread_local! {
@@ -76,32 +87,18 @@ impl AudioShapeProxy {
                 });
         })
     }
+}
 
-    pub fn set_volume(&mut self, volume: u8) {
+impl Drop for AudioShapeProxy {
+    fn drop(&mut self) {
         CURRENT_SYNTHS.with(|registry| {
             registry
                 .borrow_mut()
                 .map
                 .entry(self.id)
                 .and_modify(|synth| {
-                    synth.update_target(AudioShape {
-                        volume,
-                        ..synth.get_target()
-                    })
+                    synth.make_inactive();
                 });
-        })
-    }
-
-    pub async fn finish(mut self) {
-        self.set_volume(0);
-        Player::wait(250.0).await;
-    }
-}
-
-impl Drop for AudioShapeProxy {
-    fn drop(&mut self) {
-        CURRENT_SYNTHS.with(|registry| {
-            registry.borrow_mut().map.remove(&self.id);
         })
     }
 }
@@ -135,7 +132,7 @@ impl Player {
             latest_instant: None,
             sample_rate: config.sample_rate.0 as usize,
             sender,
-            programs_finished: false,
+            sent_finished_signal: false,
         };
         let err_fn = |err| eprintln!("an error occurred on the output audio stream: {}", err);
         let stream = device
@@ -183,9 +180,6 @@ impl Player {
     }
 
     fn run_programs(&mut self) {
-        if self.programs_finished {
-            return;
-        }
         let waker = dummy_waker();
         let mut context = Context::from_waker(&waker);
         let mut i = 0;
@@ -200,11 +194,6 @@ impl Player {
                 }
             }
             self.process_new_programs();
-        }
-        if self.programs.len() == 0 {
-            if let Ok(_) = self.sender.send(()) {
-                self.programs_finished = true;
-            }
         }
     }
 
@@ -241,6 +230,15 @@ impl Player {
 
                 for channel_sample in sample.iter_mut() {
                     *channel_sample = sample_value;
+                }
+            }
+
+            mut_registry.remove_finished_synths();
+
+            if mut_registry.map.is_empty() && self.programs.len() == 0 && !self.sent_finished_signal
+            {
+                if let Ok(_) = self.sender.send(()) {
+                    self.sent_finished_signal = true;
                 }
             }
         });
