@@ -47,7 +47,7 @@ enum Scale {
 async fn program() {
     println!("PROGRAM");
     loop {
-        Player::wait(5).await;
+        Player::wait(1000.0).await;
         println!("PROGRAM!!");
     }
 }
