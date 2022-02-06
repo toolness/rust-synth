@@ -9,6 +9,7 @@ const SEMITONES_PER_OCTAVE: i8 = 12;
 
 pub const SEMITONE: Semitones = Semitones(1);
 pub const TONE: Semitones = Semitones(2);
+#[allow(dead_code)]
 pub const OCTAVE: Semitones = Semitones(SEMITONES_PER_OCTAVE);
 pub const MAJOR_SCALE: [Semitones; 7] = [TONE, TONE, SEMITONE, TONE, TONE, TONE, SEMITONE];
 pub const MINOR_HARMONIC_SCALE: [Semitones; 7] =

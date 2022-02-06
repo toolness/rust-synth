@@ -5,12 +5,10 @@ use std::collections::HashMap;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::mpsc::{sync_channel, Receiver, SyncSender};
-use std::sync::{Arc, Mutex};
 use std::task::{Context, Poll};
 
 use crate::dummy_waker::dummy_waker;
 use crate::synth::{AudioShape, AudioShapeSynthesizer};
-use crate::tracks::Tracks;
 
 pub type PlayerProgram = Pin<Box<dyn Future<Output = ()> + Send>>;
 
@@ -42,7 +40,6 @@ impl PlayerProxy {
 pub struct Player {
     num_channels: u16,
     sample_rate: usize,
-    tracks: Tracks,
     program: PlayerProgram,
     latest_instant: Option<StreamInstant>,
     sender: SyncSender<()>,
@@ -128,14 +125,11 @@ impl Player {
     pub fn get_stream<T: Sample>(
         device: Device,
         config: &StreamConfig,
-        shape_mutex: Arc<Mutex<[AudioShape]>>,
         program: PlayerProgram,
     ) -> PlayerProxy {
         let (sender, receiver) = sync_channel(1);
-        let tracks = Tracks::new(shape_mutex, config.sample_rate.0 as usize);
         let mut player = Player {
             num_channels: config.channels,
-            tracks,
             program,
             latest_instant: None,
             sample_rate: config.sample_rate.0 as usize,
@@ -205,10 +199,6 @@ impl Player {
 
         self.run_program();
 
-        // Try to update the tracks, but don't block, because we're
-        // running in an extremely time-sensitive audio thread.
-        self.tracks.try_to_update();
-
         CURRENT_SYNTHS.with(|registry| {
             let mut mut_registry = registry.borrow_mut();
 
@@ -219,7 +209,6 @@ impl Player {
                 for (_id, synth) in mut_registry.map.iter_mut() {
                     value += synth.next().unwrap();
                 }
-                value += self.tracks.next().unwrap();
                 let sample_value = Sample::from(&(value as f32));
 
                 for channel_sample in sample.iter_mut() {
