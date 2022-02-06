@@ -45,10 +45,16 @@ enum Scale {
 }
 
 async fn program() {
-    println!("PROGRAM");
     loop {
-        Player::wait(1000.0).await;
-        println!("PROGRAM!!");
+        Player::wait(500.0).await;
+        let mut shape = Player::new_shape(AudioShape {
+            frequency: 440.0,
+            volume: 128,
+        });
+        Player::wait(500.0).await;
+        shape.set_frequency(400.0);
+        Player::wait(250.0).await;
+        shape.finish().await;
     }
 }
 
@@ -81,7 +87,7 @@ fn play_scale(tonic: MidiNote, scale: Scale, bpm: u64) {
     let shapes_mutex = Arc::new(Mutex::new([
         AudioShape {
             frequency: tonic.frequency(),
-            volume: 128,
+            volume: 0,
         },
         AudioShape {
             frequency: (tonic - OCTAVE).frequency(),

@@ -47,6 +47,10 @@ impl AudioShapeSynthesizer {
         }
     }
 
+    pub fn get_target(&self) -> AudioShape {
+        self.target
+    }
+
     pub fn update_target(&mut self, target: AudioShape) {
         self.target = target;
         self.wave_delta_per_sample =
