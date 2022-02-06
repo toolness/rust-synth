@@ -1,4 +1,4 @@
-use std::{thread::sleep, time::Duration};
+use std::time::Duration;
 
 #[derive(Debug, Copy, Clone)]
 #[allow(dead_code)]
@@ -51,9 +51,5 @@ impl BeatCounter {
         let beats_per_second = 60.0 / self.bpm as f64;
         let ms_per_beat = beats_per_second * 1000.0;
         Duration::from_millis((ms_per_beat * self.beats(length)) as u64)
-    }
-
-    pub fn sleep(&self, length: Beat) {
-        sleep(self.duration(length));
     }
 }

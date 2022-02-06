@@ -69,8 +69,6 @@ fn build_stream(shapes_mutex: Arc<Mutex<[AudioShape]>>, program: PlayerProgram) 
     }
 }
 
-async fn noop_program() {}
-
 async fn siren_program() {
     for _ in 0..5 {
         Player::wait(500.0).await;
@@ -95,53 +93,56 @@ fn play_siren() {
     player.wait_until_finished();
 }
 
-fn play_scale(tonic: MidiNote, scale: Scale, bpm: u64) {
-    let shapes_mutex = Arc::new(Mutex::new([
-        AudioShape {
-            frequency: tonic.frequency(),
-            volume: 128,
-        },
-        AudioShape {
-            frequency: (tonic - OCTAVE).frequency(),
-            volume: 0,
-        },
-    ]));
-    let player = build_stream(shapes_mutex.clone(), Box::pin(noop_program()));
-    player.stream.play().unwrap();
-
+async fn scale_program(tonic: MidiNote, scale: Scale, bpm: u64) {
     let beat_counter = BeatCounter {
         bpm,
         time_signature: TimeSignature(4, Beat::Quarter),
     };
     let mut note: MidiNote = tonic;
+    let mut shape = Player::new_shape(AudioShape {
+        frequency: note.frequency(),
+        volume: 128,
+    });
 
     let base_scale = match scale {
         Scale::Major => MAJOR_SCALE,
         Scale::MinorHarmonic => MINOR_HARMONIC_SCALE,
     };
 
+    let ms_per_quarter_note = beat_counter.duration(Beat::Quarter).as_millis() as f64;
+
     for semitones in base_scale
         .iter()
         .copied()
         .chain(base_scale.iter().rev().map(|s| -s))
     {
-        beat_counter.sleep(Beat::Quarter);
+        Player::wait(ms_per_quarter_note).await;
         note += semitones;
-        let mut shapes = shapes_mutex.lock().unwrap();
-        let mut curr_shape_note = note;
-        for shape in shapes.iter_mut() {
-            shape.frequency = curr_shape_note.frequency();
-            curr_shape_note = curr_shape_note - OCTAVE;
-        }
+        shape.set_frequency(note.frequency());
     }
 
-    beat_counter.sleep(Beat::Quarter);
+    Player::wait(ms_per_quarter_note).await;
 
-    // Avoid popping.
-    shapes_mutex.lock().unwrap().iter_mut().for_each(|shape| {
-        shape.volume = 0;
-    });
-    beat_counter.sleep(Beat::Sixteenth);
+    shape.finish().await;
+}
+
+fn play_scale(tonic: MidiNote, scale: Scale, bpm: u64) {
+    let shapes_mutex = Arc::new(Mutex::new([
+        AudioShape {
+            frequency: tonic.frequency(),
+            volume: 0,
+        },
+        AudioShape {
+            frequency: (tonic - OCTAVE).frequency(),
+            volume: 0,
+        },
+    ]));
+    let mut player = build_stream(
+        shapes_mutex.clone(),
+        Box::pin(scale_program(tonic, scale, bpm)),
+    );
+    player.stream.play().unwrap();
+    player.wait_until_finished();
 }
 
 fn main() {
