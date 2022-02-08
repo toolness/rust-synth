@@ -1,4 +1,4 @@
-use cpal::traits::DeviceTrait;
+use cpal::traits::{DeviceTrait, StreamTrait};
 use cpal::{Device, Sample, Stream, StreamConfig, StreamInstant};
 use std::cell::RefCell;
 use std::future::Future;
@@ -16,16 +16,21 @@ use crate::waiter::Waiter;
 pub type PlayerProgram = Pin<Box<dyn Future<Output = ()> + Send>>;
 
 pub struct PlayerProxy {
-    pub stream: Stream,
+    stream: Stream,
     receiver: Receiver<()>,
 }
 
 impl PlayerProxy {
-    pub fn wait_until_finished(&mut self) {
+    fn wait_until_finished(&mut self) {
         self.receiver.recv().unwrap();
         // The audio thread has finished generating audio, but it may still
         // need to be played, so give a bit of time for that.
         sleep(Duration::from_millis(250));
+    }
+
+    pub fn play_until_finished(mut self) {
+        self.stream.play().unwrap();
+        self.wait_until_finished();
     }
 }
 

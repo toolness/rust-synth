@@ -1,6 +1,6 @@
 use beat::{Beat, BeatCounter, TimeSignature};
 use clap::{AppSettings, ArgEnum, Parser, Subcommand};
-use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
+use cpal::traits::{DeviceTrait, HostTrait};
 use cpal::SampleFormat;
 
 mod beat;
@@ -129,9 +129,8 @@ fn main() {
     let cli = Args::parse();
     match &cli.command {
         Commands::Siren {} => {
-            let mut player = build_stream(Box::pin(siren_program()));
-            player.stream.play().unwrap();
-            player.wait_until_finished();
+            let player = build_stream(Box::pin(siren_program()));
+            player.play_until_finished();
         }
         Commands::Scale {
             note,
@@ -149,14 +148,13 @@ fn main() {
             } else {
                 "C4".try_into().unwrap()
             };
-            let mut player = build_stream(Box::pin(scale_program(
+            let player = build_stream(Box::pin(scale_program(
                 tonic,
                 scale.unwrap_or(Scale::Major),
                 bpm.unwrap_or(60),
                 *octaves,
             )));
-            player.stream.play().unwrap();
-            player.wait_until_finished();
+            player.play_until_finished();
         }
     }
 }
