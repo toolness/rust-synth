@@ -41,6 +41,8 @@ enum Commands {
     },
     /// Plays a siren sound.
     Siren {},
+    /// Outputs a siren sound to a WAV file.
+    SirenWav {},
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, ArgEnum)]
@@ -128,6 +130,11 @@ async fn play_scale(tonic: MidiNote, scale: Scale, bpm: u64) {
 fn main() {
     let cli = Args::parse();
     match &cli.command {
+        &Commands::SirenWav {} => {
+            let filename = "siren.wav";
+            Player::write_wav(filename, Box::pin(siren_program()));
+            println!("Wrote {}.", filename);
+        }
         Commands::Siren {} => {
             let player = build_stream(Box::pin(siren_program()));
             player.play_until_finished();

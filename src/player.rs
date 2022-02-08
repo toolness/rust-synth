@@ -1,7 +1,9 @@
 use cpal::traits::{DeviceTrait, StreamTrait};
 use cpal::{Device, Sample, Stream, StreamConfig, StreamInstant};
+use hound;
 use std::cell::{RefCell, RefMut};
 use std::future::Future;
+use std::path::Path;
 use std::pin::Pin;
 use std::sync::mpsc::{sync_channel, Receiver, SyncSender};
 use std::task::Context;
@@ -39,8 +41,8 @@ pub struct Player {
     sample_rate: usize,
     programs: Vec<PlayerProgram>,
     latest_instant: Option<StreamInstant>,
-    sender: SyncSender<()>,
-    sent_finished_signal: bool,
+    sender: Option<SyncSender<()>>,
+    is_finished: bool,
 }
 
 thread_local! {
@@ -82,6 +84,26 @@ impl Drop for AudioShapeProxy {
 }
 
 impl Player {
+    pub fn write_wav<P: AsRef<Path>>(filename: P, program: PlayerProgram) {
+        let spec = hound::WavSpec {
+            channels: 1,
+            sample_rate: 44100,
+            bits_per_sample: 32,
+            sample_format: hound::SampleFormat::Float,
+        };
+        let mut writer = hound::WavWriter::create(filename, spec).unwrap();
+        let mut player = Player {
+            num_channels: spec.channels,
+            programs: vec![program],
+            latest_instant: None,
+            sample_rate: spec.sample_rate as usize,
+            sender: None,
+            is_finished: false,
+        };
+        player.write_wav_audio(&mut writer);
+        writer.finalize().unwrap();
+    }
+
     pub fn get_stream<T: Sample>(
         device: Device,
         config: &StreamConfig,
@@ -93,8 +115,8 @@ impl Player {
             programs: vec![program],
             latest_instant: None,
             sample_rate: config.sample_rate.0 as usize,
-            sender,
-            sent_finished_signal: false,
+            sender: Some(sender),
+            is_finished: false,
         };
         let err_fn = |err| eprintln!("an error occurred on the output audio stream: {}", err);
         let stream = device
@@ -172,10 +194,44 @@ impl Player {
     fn check_finished(&mut self, mut_registry: &mut RefMut<SynthRegistry>) {
         mut_registry.remove_finished_synths();
 
-        if mut_registry.is_empty() && self.programs.len() == 0 && !self.sent_finished_signal {
-            if let Ok(_) = self.sender.send(()) {
-                self.sent_finished_signal = true;
+        if mut_registry.is_empty() && self.programs.len() == 0 && !self.is_finished {
+            if let Some(sender) = &self.sender {
+                if let Ok(_) = sender.send(()) {
+                    self.is_finished = true;
+                }
+            } else {
+                self.is_finished = true;
             }
+        }
+    }
+
+    fn write_wav_audio<W: std::io::Write + std::io::Seek>(
+        &mut self,
+        writer: &mut hound::WavWriter<W>,
+    ) {
+        assert_eq!(self.num_channels, 1);
+        let samples_per_10_ms = self.sample_rate / 100;
+        self.init_thread_locals();
+
+        while !self.is_finished {
+            self.execute_programs();
+
+            CURRENT_SYNTHS.with(|registry| {
+                let mut mut_registry = registry.borrow_mut();
+
+                for _ in 0..samples_per_10_ms {
+                    let value = mut_registry.next_sample();
+                    writer.write_sample(value as f32).unwrap();
+                }
+                self.check_finished(&mut mut_registry);
+            });
+
+            self.increment_current_time(10.0);
+        }
+
+        // Write about a quarter-second of silence.
+        for _ in 0..(self.sample_rate / 4) {
+            writer.write_sample(0.0).unwrap();
         }
     }
 
