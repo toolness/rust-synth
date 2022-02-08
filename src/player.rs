@@ -1,6 +1,6 @@
 use cpal::traits::{DeviceTrait, StreamTrait};
 use cpal::{Device, Sample, Stream, StreamConfig, StreamInstant};
-use std::cell::RefCell;
+use std::cell::{RefCell, RefMut};
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::mpsc::{sync_channel, Receiver, SyncSender};
@@ -154,20 +154,41 @@ impl Player {
         }
     }
 
+    fn init_thread_locals(&mut self) {
+        CURRENT_SAMPLE_RATE.with(|value| {
+            *value.borrow_mut() = Some(self.sample_rate);
+        });
+        CURRENT_TIME.with(|value| {
+            *value.borrow_mut() = 0.0;
+        });
+    }
+
+    fn increment_current_time(&mut self, amount: f64) {
+        CURRENT_TIME.with(|value| {
+            *value.borrow_mut() += amount;
+        });
+    }
+
+    fn check_finished(&mut self, mut_registry: &mut RefMut<SynthRegistry>) {
+        mut_registry.remove_finished_synths();
+
+        if mut_registry.is_empty() && self.programs.len() == 0 && !self.sent_finished_signal {
+            if let Ok(_) = self.sender.send(()) {
+                self.sent_finished_signal = true;
+            }
+        }
+    }
+
     fn write_audio<T: Sample>(&mut self, data: &mut [T], info: &cpal::OutputCallbackInfo) {
         let latest_instant = info.timestamp().playback;
         if let Some(previous_instant) = self.latest_instant {
-            CURRENT_TIME.with(|value| {
-                // Bizzarely, the latest instant can sometimes be *before* our
-                // previous one, so we need to check here.
-                if let Some(duration) = latest_instant.duration_since(&previous_instant) {
-                    *value.borrow_mut() += duration.as_millis() as f64;
-                }
-            });
+            // Bizzarely, the latest instant can sometimes be *before* our
+            // previous one, so we need to check here.
+            if let Some(duration) = latest_instant.duration_since(&previous_instant) {
+                self.increment_current_time(duration.as_millis() as f64);
+            }
         } else {
-            CURRENT_SAMPLE_RATE.with(|value| {
-                *value.borrow_mut() = Some(self.sample_rate);
-            });
+            self.init_thread_locals();
         }
         self.latest_instant = Some(latest_instant);
 
@@ -187,13 +208,7 @@ impl Player {
                 }
             }
 
-            mut_registry.remove_finished_synths();
-
-            if mut_registry.is_empty() && self.programs.len() == 0 && !self.sent_finished_signal {
-                if let Ok(_) = self.sender.send(()) {
-                    self.sent_finished_signal = true;
-                }
-            }
+            self.check_finished(&mut mut_registry);
         });
     }
 }
