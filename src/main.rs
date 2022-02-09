@@ -52,13 +52,15 @@ enum Scale {
     MinorHarmonic,
 }
 
-fn run_program(program: PlayerProgram, output: &Option<String>) {
-    if let Some(filename) = output {
-        Player::write_wav(filename, program);
-        println!("Wrote {}.", filename);
-    } else {
-        let player = build_stream(program);
-        player.play_until_finished();
+impl Args {
+    fn run_program(&self, program: PlayerProgram) {
+        if let Some(filename) = &self.output {
+            Player::write_wav(filename, program);
+            println!("Wrote {}.", filename);
+        } else {
+            let player = build_stream(program);
+            player.play_until_finished();
+        }
     }
 }
 
@@ -142,7 +144,7 @@ fn main() {
     let cli = Args::parse();
     match &cli.command {
         Commands::Siren {} => {
-            run_program(Box::pin(siren_program()), &cli.output);
+            cli.run_program(Box::pin(siren_program()));
         }
         Commands::Scale {
             note,
@@ -160,15 +162,12 @@ fn main() {
             } else {
                 "C4".try_into().unwrap()
             };
-            run_program(
-                Box::pin(scale_program(
-                    tonic,
-                    scale.unwrap_or(Scale::Major),
-                    bpm.unwrap_or(60),
-                    *octaves,
-                )),
-                &cli.output,
-            )
+            cli.run_program(Box::pin(scale_program(
+                tonic,
+                scale.unwrap_or(Scale::Major),
+                bpm.unwrap_or(60),
+                *octaves,
+            )))
         }
     }
 }
