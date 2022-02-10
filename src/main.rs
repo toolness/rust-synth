@@ -44,6 +44,8 @@ enum Commands {
     },
     /// Plays a siren sound.
     Siren {},
+    /// Plays the song "Captain Silver" from pg. 21 of Schaum's Red Book (Alfred).
+    CaptainSilver {},
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, ArgEnum)]
@@ -87,6 +89,30 @@ fn build_stream(program: PlayerProgram) -> PlayerProxy {
         SampleFormat::I16 => Player::get_stream::<i16>(device, &config, program),
         SampleFormat::U16 => Player::get_stream::<u16>(device, &config, program),
     }
+}
+
+async fn captain_silver_program() {
+    let beats = BeatCounter {
+        bpm: 120,
+        time_signature: TimeSignature(4, Beat::Quarter),
+    };
+
+    async fn right_hand() {
+        let track = Player::new_shape(AudioShape {
+            frequency: 440.0,
+            volume: 0,
+        });
+    }
+
+    async fn left_hand() {
+        let track = Player::new_shape(AudioShape {
+            frequency: 440.0,
+            volume: 0,
+        });
+    }
+
+    Player::start_program(Box::pin(right_hand()));
+    Player::start_program(Box::pin(left_hand()));
 }
 
 async fn siren_program() {
@@ -143,6 +169,9 @@ async fn play_scale(tonic: MidiNote, scale: Scale, bpm: u64) {
 fn main() {
     let cli = Args::parse();
     match &cli.command {
+        &Commands::CaptainSilver {} => {
+            cli.run_program(Box::pin(captain_silver_program()));
+        }
         Commands::Siren {} => {
             cli.run_program(Box::pin(siren_program()));
         }
