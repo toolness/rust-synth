@@ -71,6 +71,17 @@ impl AudioShapeProxy {
             });
         })
     }
+
+    pub fn set_volume(&mut self, volume: u8) {
+        CURRENT_SYNTHS.with(|registry| {
+            registry.borrow_mut().modify(self.id, |synth| {
+                synth.update_target(AudioShape {
+                    volume,
+                    ..synth.get_target()
+                })
+            });
+        })
+    }
 }
 
 impl Drop for AudioShapeProxy {

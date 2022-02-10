@@ -20,6 +20,7 @@ impl Beat {
     }
 }
 
+#[derive(Copy, Clone)]
 pub struct TimeSignature(pub u64, pub Beat);
 
 impl TimeSignature {
@@ -33,6 +34,7 @@ impl TimeSignature {
     }
 }
 
+#[derive(Copy, Clone)]
 pub struct BeatCounter {
     pub bpm: u64,
     pub time_signature: TimeSignature,

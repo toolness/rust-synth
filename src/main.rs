@@ -12,7 +12,7 @@ mod synth_registry;
 mod waiter;
 
 use note::{MidiNote, MAJOR_SCALE, MINOR_HARMONIC_SCALE, OCTAVE};
-use player::{Player, PlayerProgram, PlayerProxy};
+use player::{AudioShapeProxy, Player, PlayerProgram, PlayerProxy};
 use synth::AudioShape;
 
 #[derive(Parser, Debug)]
@@ -91,28 +91,106 @@ fn build_stream(program: PlayerProgram) -> PlayerProxy {
     }
 }
 
+// Amount of time to pause between notes (when not slurring)
+const PAUSE_MS: f64 = 30.0;
+
+struct Instrument {
+    beat_counter: BeatCounter,
+    shape: AudioShapeProxy,
+    max_volume: u8,
+}
+
+impl Instrument {
+    fn new(beat_counter: BeatCounter, max_volume: u8) -> Self {
+        Instrument {
+            beat_counter,
+            shape: Player::new_shape(AudioShape {
+                frequency: 440.0,
+                volume: 0,
+            }),
+            max_volume,
+        }
+    }
+
+    async fn play_note(&mut self, note: &str, length: Beat) {
+        let ms = self.beat_counter.duration_in_millis(length);
+        let note = MidiNote::try_from(note).unwrap();
+        self.shape.set_frequency(note.frequency());
+        self.shape.set_volume(self.max_volume);
+        Player::wait(ms - PAUSE_MS).await;
+        self.shape.set_volume(0);
+        Player::wait(PAUSE_MS).await;
+    }
+
+    async fn rest(&mut self, length: Beat) {
+        let ms = self.beat_counter.duration_in_millis(length);
+        self.shape.set_volume(0);
+        Player::wait(ms).await;
+    }
+}
+
 async fn captain_silver_program() {
     let beats = BeatCounter {
         bpm: 120,
         time_signature: TimeSignature(4, Beat::Quarter),
     };
 
-    async fn right_hand() {
-        let track = Player::new_shape(AudioShape {
-            frequency: 440.0,
-            volume: 0,
-        });
-    }
+    let right_hand = async move {
+        let mut hand = Instrument::new(beats, 63);
 
-    async fn left_hand() {
-        let track = Player::new_shape(AudioShape {
-            frequency: 440.0,
-            volume: 0,
-        });
-    }
+        // Measures 1-4
+        for _ in 0..5 {
+            hand.play_note("E4", Beat::Half).await;
+        }
+        hand.play_note("E4", Beat::Quarter).await;
+        hand.play_note("F4", Beat::Quarter).await;
+        hand.play_note("G4", Beat::Whole).await;
 
-    Player::start_program(Box::pin(right_hand()));
-    Player::start_program(Box::pin(left_hand()));
+        // Measures 5-8
+        hand.play_note("F4", Beat::Half).await;
+        hand.play_note("F4", Beat::Half).await;
+        hand.play_note("D4", Beat::Half).await;
+        hand.play_note("D4", Beat::Half).await;
+        hand.play_note("G4", Beat::Whole).await;
+        hand.play_note("F4", Beat::Whole).await;
+    };
+
+    let left_hand = async move {
+        let mut hand = Instrument::new(beats, 63);
+
+        // Measures 1-4
+        for _ in 0..5 {
+            hand.play_note("C3", Beat::Quarter).await;
+            hand.play_note("G3", Beat::Quarter).await;
+        }
+        hand.play_note("C3", Beat::Quarter).await;
+        hand.rest(Beat::Quarter).await;
+        for _ in 0..2 {
+            hand.play_note("E3", Beat::Quarter).await;
+            hand.play_note("G3", Beat::Quarter).await;
+        }
+
+        // Measures 5-8
+        for _ in 0..2 {
+            hand.play_note("D3", Beat::Quarter).await;
+            hand.play_note("G3", Beat::Quarter).await;
+        }
+        for _ in 0..2 {
+            hand.play_note("F3", Beat::Quarter).await;
+            hand.play_note("G3", Beat::Quarter).await;
+        }
+        for _ in 0..2 {
+            hand.play_note("E3", Beat::Quarter).await;
+            hand.play_note("G3", Beat::Quarter).await;
+        }
+        for _ in 0..2 {
+            hand.play_note("D3", Beat::Quarter).await;
+            hand.play_note("G3", Beat::Quarter).await;
+        }
+    };
+
+    Player::start_program(Box::pin(right_hand));
+    Player::start_program(Box::pin(left_hand));
 }
 
 async fn siren_program() {
