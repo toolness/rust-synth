@@ -92,7 +92,7 @@ fn build_stream(program: PlayerProgram) -> PlayerProxy {
 }
 
 // Amount of time to pause between notes (when not slurring)
-const PAUSE_MS: f64 = 30.0;
+const PAUSE_MS: f64 = 50.0;
 
 struct Instrument {
     beat_counter: BeatCounter,
@@ -120,6 +120,14 @@ impl Instrument {
         Player::wait(ms - PAUSE_MS).await;
         self.shape.set_volume(0);
         Player::wait(PAUSE_MS).await;
+    }
+
+    async fn play_note_without_release(&mut self, note: &str, length: Beat) {
+        let ms = self.beat_counter.duration_in_millis(length);
+        let note = MidiNote::try_from(note).unwrap();
+        self.shape.set_frequency(note.frequency());
+        self.shape.set_volume(self.max_volume);
+        Player::wait(ms).await;
     }
 
     async fn rest(&mut self, length: Beat) {
@@ -153,6 +161,22 @@ async fn captain_silver_program() {
         hand.play_note("D4", Beat::Half).await;
         hand.play_note("G4", Beat::Whole).await;
         hand.play_note("F4", Beat::Whole).await;
+
+        // Measures 9-12 (same as 1-4)
+        for _ in 0..5 {
+            hand.play_note("E4", Beat::Half).await;
+        }
+        hand.play_note("E4", Beat::Quarter).await;
+        hand.play_note("F4", Beat::Quarter).await;
+        hand.play_note("G4", Beat::Whole).await;
+
+        // Measures 13-16
+        hand.play_note("F4", Beat::Half).await;
+        hand.play_note("F4", Beat::Half).await;
+        hand.play_note("D4", Beat::Half).await;
+        hand.play_note("D4", Beat::Half).await;
+        hand.play_note_without_release("C4", Beat::Whole).await;
+        hand.play_note("C4", Beat::Whole).await;
     };
 
     let left_hand = async move {
@@ -187,6 +211,33 @@ async fn captain_silver_program() {
             hand.play_note("D3", Beat::Quarter).await;
             hand.play_note("G3", Beat::Quarter).await;
         }
+
+        // Measures 9-12 (same as 1-4)
+        for _ in 0..5 {
+            hand.play_note("C3", Beat::Quarter).await;
+            hand.play_note("G3", Beat::Quarter).await;
+        }
+        hand.play_note("C3", Beat::Quarter).await;
+        hand.rest(Beat::Quarter).await;
+        for _ in 0..2 {
+            hand.play_note("E3", Beat::Quarter).await;
+            hand.play_note("G3", Beat::Quarter).await;
+        }
+
+        // Measures 13-16
+        for _ in 0..2 {
+            hand.play_note("D3", Beat::Quarter).await;
+            hand.play_note("G3", Beat::Quarter).await;
+        }
+        for _ in 0..2 {
+            hand.play_note("F3", Beat::Quarter).await;
+            hand.play_note("G3", Beat::Quarter).await;
+        }
+        for _ in 0..2 {
+            hand.play_note("E3", Beat::Quarter).await;
+            hand.play_note("G3", Beat::Quarter).await;
+        }
+        hand.play_note("C3", Beat::Whole).await;
     };
 
     Player::start_program(Box::pin(right_hand));
