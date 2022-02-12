@@ -238,17 +238,22 @@ impl Player {
         self.increment_total_samples(num_samples);
     }
 
+    fn samples_per_program_loop(&self) -> usize {
+        let samples_per_ms = self.sample_rate / 1000;
+        samples_per_ms / 2
+    }
+
     fn write_wav_audio<W: std::io::Write + std::io::Seek>(
         &mut self,
         writer: &mut hound::WavWriter<W>,
     ) {
         assert_eq!(self.num_channels, 1);
-        let samples_per_10_ms = self.sample_rate / 100;
+        let num_samples = self.samples_per_program_loop();
         self.init_thread_locals();
 
         while !self.is_finished {
-            self.generate_samples(samples_per_10_ms, |registry| {
-                for _ in 0..samples_per_10_ms {
+            self.generate_samples(num_samples, |registry| {
+                for _ in 0..num_samples {
                     let value = registry.next_sample();
                     writer.write_sample(value as f32).unwrap();
                 }
@@ -267,17 +272,19 @@ impl Player {
         }
 
         let num_channels = self.num_channels as usize;
-        self.generate_samples(data.len() / num_channels, |registry| {
-            // We use chunks_mut() to access individual channels:
-            // https://github.com/RustAudio/cpal/blob/master/examples/beep.rs#L127
-            for sample in data.chunks_mut(num_channels) {
-                let value = registry.next_sample();
-                let sample_value = Sample::from(&(value as f32));
+        for chunk in data.chunks_mut(self.samples_per_program_loop() * num_channels) {
+            self.generate_samples(chunk.len() / num_channels, |registry| {
+                // We use chunks_mut() to access individual channels:
+                // https://github.com/RustAudio/cpal/blob/master/examples/beep.rs#L127
+                for sample in chunk.chunks_mut(num_channels) {
+                    let value = registry.next_sample();
+                    let sample_value = Sample::from(&(value as f32));
 
-                for channel_sample in sample.iter_mut() {
-                    *channel_sample = sample_value;
+                    for channel_sample in sample.iter_mut() {
+                        *channel_sample = sample_value;
+                    }
                 }
-            }
-        });
+            });
+        }
     }
 }
