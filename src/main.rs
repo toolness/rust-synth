@@ -80,7 +80,7 @@ impl Args {
 fn convert_wav_to_mp3(wav_filename: &str, mp3_filename: &String) -> bool {
     let mut success = false;
     let cmd = format!(
-        "ffmpeg -i {} -ar {} -ac {} -b:a 192k {}",
+        "ffmpeg -y -i {} -ar {} -ac {} -b:a 128k {}",
         wav_filename, WAV_SAMPLE_RATE, WAV_CHANNELS, mp3_filename
     );
     if let Ok(mut child) = Command::new("bash").args(["-c", &cmd]).spawn() {
