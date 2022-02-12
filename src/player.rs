@@ -1,5 +1,5 @@
 use cpal::traits::{DeviceTrait, StreamTrait};
-use cpal::{Device, Sample, Stream, StreamConfig, StreamInstant};
+use cpal::{Device, Sample, Stream, StreamConfig};
 use hound;
 use std::cell::{RefCell, RefMut};
 use std::future::Future;
@@ -93,7 +93,7 @@ pub struct Player {
     num_channels: u16,
     sample_rate: usize,
     programs: Vec<PlayerProgram>,
-    latest_instant: Option<StreamInstant>,
+    total_samples: usize,
     sender: Option<SyncSender<()>>,
     is_finished: bool,
 }
@@ -110,7 +110,7 @@ impl Player {
         let mut player = Player {
             num_channels: spec.channels,
             programs: vec![program],
-            latest_instant: None,
+            total_samples: 0,
             sample_rate: spec.sample_rate as usize,
             sender: None,
             is_finished: false,
@@ -128,7 +128,7 @@ impl Player {
         let mut player = Player {
             num_channels: config.channels,
             programs: vec![program],
-            latest_instant: None,
+            total_samples: 0,
             sample_rate: config.sample_rate.0 as usize,
             sender: Some(sender),
             is_finished: false,
@@ -200,9 +200,10 @@ impl Player {
         });
     }
 
-    fn increment_current_time(&mut self, amount: f64) {
+    fn increment_total_samples(&mut self, amount: usize) {
+        self.total_samples += amount;
         CURRENT_TIME.with(|value| {
-            *value.borrow_mut() += amount;
+            *value.borrow_mut() = (self.total_samples as f64 / self.sample_rate as f64) * 1000.0;
         });
     }
 
@@ -241,7 +242,7 @@ impl Player {
                 self.check_finished(&mut mut_registry);
             });
 
-            self.increment_current_time(10.0);
+            self.increment_total_samples(samples_per_10_ms);
         }
 
         // Write about a quarter-second of silence.
@@ -250,18 +251,10 @@ impl Player {
         }
     }
 
-    fn write_audio<T: Sample>(&mut self, data: &mut [T], info: &cpal::OutputCallbackInfo) {
-        let latest_instant = info.timestamp().playback;
-        if let Some(previous_instant) = self.latest_instant {
-            // Bizzarely, the latest instant can sometimes be *before* our
-            // previous one, so we need to check here.
-            if let Some(duration) = latest_instant.duration_since(&previous_instant) {
-                self.increment_current_time(duration.as_millis() as f64);
-            }
-        } else {
+    fn write_audio<T: Sample>(&mut self, data: &mut [T], _info: &cpal::OutputCallbackInfo) {
+        if self.total_samples == 0 {
             self.init_thread_locals();
         }
-        self.latest_instant = Some(latest_instant);
 
         self.execute_programs();
 
@@ -279,6 +272,7 @@ impl Player {
                 }
             }
 
+            self.increment_total_samples(data.len() / self.num_channels as usize);
             self.check_finished(&mut mut_registry);
         });
     }
