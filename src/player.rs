@@ -221,6 +221,23 @@ impl Player {
         }
     }
 
+    fn generate_samples<F: FnOnce(&mut RefMut<SynthRegistry>)>(
+        &mut self,
+        num_samples: usize,
+        f: F,
+    ) {
+        self.execute_programs();
+
+        CURRENT_SYNTHS.with(|registry| {
+            let mut mut_registry = registry.borrow_mut();
+
+            f(&mut mut_registry);
+            self.check_finished(&mut mut_registry);
+        });
+
+        self.increment_total_samples(num_samples);
+    }
+
     fn write_wav_audio<W: std::io::Write + std::io::Seek>(
         &mut self,
         writer: &mut hound::WavWriter<W>,
@@ -230,19 +247,12 @@ impl Player {
         self.init_thread_locals();
 
         while !self.is_finished {
-            self.execute_programs();
-
-            CURRENT_SYNTHS.with(|registry| {
-                let mut mut_registry = registry.borrow_mut();
-
+            self.generate_samples(samples_per_10_ms, |registry| {
                 for _ in 0..samples_per_10_ms {
-                    let value = mut_registry.next_sample();
+                    let value = registry.next_sample();
                     writer.write_sample(value as f32).unwrap();
                 }
-                self.check_finished(&mut mut_registry);
             });
-
-            self.increment_total_samples(samples_per_10_ms);
         }
 
         // Write about a quarter-second of silence.
@@ -256,24 +266,18 @@ impl Player {
             self.init_thread_locals();
         }
 
-        self.execute_programs();
-
-        CURRENT_SYNTHS.with(|registry| {
-            let mut mut_registry = registry.borrow_mut();
-
+        let num_channels = self.num_channels as usize;
+        self.generate_samples(data.len() / num_channels, |registry| {
             // We use chunks_mut() to access individual channels:
             // https://github.com/RustAudio/cpal/blob/master/examples/beep.rs#L127
-            for sample in data.chunks_mut(self.num_channels as usize) {
-                let value = mut_registry.next_sample();
+            for sample in data.chunks_mut(num_channels) {
+                let value = registry.next_sample();
                 let sample_value = Sample::from(&(value as f32));
 
                 for channel_sample in sample.iter_mut() {
                     *channel_sample = sample_value;
                 }
             }
-
-            self.increment_total_samples(data.len() / self.num_channels as usize);
-            self.check_finished(&mut mut_registry);
         });
     }
 }
