@@ -1,3 +1,5 @@
+use std::process::Command;
+
 use beat::{Beat, BeatCounter, TimeSignature};
 use clap::{AppSettings, ArgEnum, Parser, Subcommand};
 use cpal::traits::{DeviceTrait, HostTrait};
@@ -12,7 +14,7 @@ mod synth_registry;
 mod waiter;
 
 use note::{MidiNote, MAJOR_SCALE, MINOR_HARMONIC_SCALE, OCTAVE};
-use player::{AudioShapeProxy, Player, PlayerProgram, PlayerProxy};
+use player::{AudioShapeProxy, Player, PlayerProgram, PlayerProxy, WAV_CHANNELS, WAV_SAMPLE_RATE};
 use synth::AudioShape;
 
 #[derive(Parser, Debug)]
@@ -23,7 +25,7 @@ struct Args {
     #[clap(subcommand)]
     command: Commands,
     #[clap(long, short = 'o')]
-    /// Output to WAV file.
+    /// Output to WAV or MP3 file (MP3 requires ffmpeg).
     output: Option<String>,
 }
 
@@ -57,13 +59,44 @@ enum Scale {
 impl Args {
     fn run_program(&self, program: PlayerProgram) {
         if let Some(filename) = &self.output {
-            Player::write_wav(filename, program);
+            let is_mp3 = filename.ends_with(".mp3");
+            let wav_filename = if is_mp3 { "temp.wav" } else { &filename };
+            Player::write_wav(wav_filename, program);
+            if is_mp3 {
+                let success = convert_wav_to_mp3(wav_filename, filename);
+                std::fs::remove_file(wav_filename).unwrap();
+                if !success {
+                    std::process::exit(1);
+                }
+            }
             println!("Wrote {}.", filename);
         } else {
             let player = build_stream(program);
             player.play_until_finished();
         }
     }
+}
+
+fn convert_wav_to_mp3(wav_filename: &str, mp3_filename: &String) -> bool {
+    let mut success = false;
+    let cmd = format!(
+        "ffmpeg -i {} -ar {} -ac {} -b:a 192k {}",
+        wav_filename, WAV_SAMPLE_RATE, WAV_CHANNELS, mp3_filename
+    );
+    if let Ok(mut child) = Command::new("bash").args(["-c", &cmd]).spawn() {
+        if let Ok(ffmpeg_exit_code) = child.wait() {
+            if ffmpeg_exit_code.success() {
+                success = true;
+            } else {
+                println!("An error occurred running ffmpeg.");
+            }
+        } else {
+            println!("An error occurred while waiting for ffmpeg to exit.");
+        }
+    } else {
+        println!("Starting ffmpeg failed, you may need to install it.");
+    }
+    success
 }
 
 fn build_stream(program: PlayerProgram) -> PlayerProxy {

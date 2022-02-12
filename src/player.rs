@@ -17,6 +17,10 @@ use crate::waiter::Waiter;
 
 pub type PlayerProgram = Pin<Box<dyn Future<Output = ()> + Send>>;
 
+pub const WAV_CHANNELS: u16 = 1;
+
+pub const WAV_SAMPLE_RATE: u32 = 44100;
+
 pub struct PlayerProxy {
     stream: Stream,
     receiver: Receiver<()>,
@@ -97,8 +101,8 @@ impl Drop for AudioShapeProxy {
 impl Player {
     pub fn write_wav<P: AsRef<Path>>(filename: P, program: PlayerProgram) {
         let spec = hound::WavSpec {
-            channels: 1,
-            sample_rate: 44100,
+            channels: WAV_CHANNELS,
+            sample_rate: WAV_SAMPLE_RATE,
             bits_per_sample: 32,
             sample_format: hound::SampleFormat::Float,
         };
