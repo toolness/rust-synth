@@ -21,6 +21,17 @@ pub const WAV_CHANNELS: u16 = 1;
 
 pub const WAV_SAMPLE_RATE: u32 = 44100;
 
+thread_local! {
+    static CURRENT_SAMPLE_RATE: RefCell<Option<usize>> = RefCell::new(None);
+    static CURRENT_TIME: RefCell<f64> = RefCell::new(0.0);
+    static CURRENT_SYNTHS: RefCell<SynthRegistry> = RefCell::new(SynthRegistry::new());
+    static NEW_PROGRAMS: RefCell<Vec<PlayerProgram>> = RefCell::new(vec![]);
+}
+
+fn get_current_time() -> f64 {
+    CURRENT_TIME.with(|value| *value.borrow())
+}
+
 pub struct PlayerProxy {
     stream: Stream,
     receiver: Receiver<()>,
@@ -38,26 +49,6 @@ impl PlayerProxy {
         self.stream.play().unwrap();
         self.wait_until_finished();
     }
-}
-
-pub struct Player {
-    num_channels: u16,
-    sample_rate: usize,
-    programs: Vec<PlayerProgram>,
-    latest_instant: Option<StreamInstant>,
-    sender: Option<SyncSender<()>>,
-    is_finished: bool,
-}
-
-thread_local! {
-    static CURRENT_SAMPLE_RATE: RefCell<Option<usize>> = RefCell::new(None);
-    static CURRENT_TIME: RefCell<f64> = RefCell::new(0.0);
-    static CURRENT_SYNTHS: RefCell<SynthRegistry> = RefCell::new(SynthRegistry::new());
-    static NEW_PROGRAMS: RefCell<Vec<PlayerProgram>> = RefCell::new(vec![]);
-}
-
-fn get_current_time() -> f64 {
-    CURRENT_TIME.with(|value| *value.borrow())
 }
 
 pub struct AudioShapeProxy {
@@ -96,6 +87,15 @@ impl Drop for AudioShapeProxy {
             });
         })
     }
+}
+
+pub struct Player {
+    num_channels: u16,
+    sample_rate: usize,
+    programs: Vec<PlayerProgram>,
+    latest_instant: Option<StreamInstant>,
+    sender: Option<SyncSender<()>>,
+    is_finished: bool,
 }
 
 impl Player {
