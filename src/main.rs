@@ -57,7 +57,7 @@ enum Scale {
 }
 
 impl Args {
-    fn run_program(&self, program: PlayerProgram) {
+    fn run_program<P: PlayerProgram>(&self, program: P) {
         if let Some(filename) = &self.output {
             let is_mp3 = filename.ends_with(".mp3");
             let wav_filename = if is_mp3 { "temp.wav" } else { &filename };
@@ -99,7 +99,7 @@ fn convert_wav_to_mp3(wav_filename: &str, mp3_filename: &String) -> bool {
     success
 }
 
-fn build_stream(program: PlayerProgram) -> PlayerProxy {
+fn build_stream<P: PlayerProgram>(program: P) -> PlayerProxy {
     let host = cpal::default_host();
     let device = host
         .default_output_device()
@@ -118,9 +118,9 @@ fn build_stream(program: PlayerProgram) -> PlayerProxy {
     );
     let config = supported_config.into();
     match sample_format {
-        SampleFormat::F32 => Player::get_stream::<f32>(device, &config, program),
-        SampleFormat::I16 => Player::get_stream::<i16>(device, &config, program),
-        SampleFormat::U16 => Player::get_stream::<u16>(device, &config, program),
+        SampleFormat::F32 => Player::get_stream::<f32, P>(device, &config, program),
+        SampleFormat::I16 => Player::get_stream::<i16, P>(device, &config, program),
+        SampleFormat::U16 => Player::get_stream::<u16, P>(device, &config, program),
     }
 }
 
@@ -270,8 +270,8 @@ async fn captain_silver_program() {
         hand.play_note("C3", Beat::Whole).await;
     };
 
-    Player::start_program(Box::pin(right_hand));
-    Player::start_program(Box::pin(left_hand));
+    Player::start_program(right_hand);
+    Player::start_program(left_hand);
 }
 
 async fn siren_program() {
@@ -289,7 +289,7 @@ async fn siren_program() {
 
 async fn scale_program(tonic: MidiNote, scale: Scale, bpm: u64, octaves: bool) {
     if octaves {
-        Player::start_program(Box::pin(play_scale(tonic + OCTAVE, scale, bpm)));
+        Player::start_program(play_scale(tonic + OCTAVE, scale, bpm));
     }
     play_scale(tonic, scale, bpm).await;
 }
@@ -329,10 +329,10 @@ fn main() {
     let cli = Args::parse();
     match &cli.command {
         &Commands::CaptainSilver {} => {
-            cli.run_program(Box::pin(captain_silver_program()));
+            cli.run_program(captain_silver_program());
         }
         Commands::Siren {} => {
-            cli.run_program(Box::pin(siren_program()));
+            cli.run_program(siren_program());
         }
         Commands::Scale {
             note,
@@ -350,12 +350,12 @@ fn main() {
             } else {
                 "C4".try_into().unwrap()
             };
-            cli.run_program(Box::pin(scale_program(
+            cli.run_program(scale_program(
                 tonic,
                 scale.unwrap_or(Scale::Major),
                 bpm.unwrap_or(60),
                 *octaves,
-            )))
+            ))
         }
     }
 }

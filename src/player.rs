@@ -15,7 +15,7 @@ use crate::synth::{AudioShape, AudioShapeSynthesizer};
 use crate::synth_registry::SynthRegistry;
 use crate::waiter::Waiter;
 
-pub type PlayerProgram = Pin<Box<dyn Future<Output = ()> + Send>>;
+type PinnedPlayerProgram = Pin<Box<dyn Future<Output = ()> + Send>>;
 
 pub const WAV_CHANNELS: u16 = 1;
 
@@ -25,8 +25,12 @@ thread_local! {
     static CURRENT_SAMPLE_RATE: RefCell<Option<usize>> = RefCell::new(None);
     static CURRENT_TIME: RefCell<f64> = RefCell::new(0.0);
     static CURRENT_SYNTHS: RefCell<SynthRegistry> = RefCell::new(SynthRegistry::new());
-    static NEW_PROGRAMS: RefCell<Vec<PlayerProgram>> = RefCell::new(vec![]);
+    static NEW_PROGRAMS: RefCell<Vec<PinnedPlayerProgram>> = RefCell::new(vec![]);
 }
+
+pub trait PlayerProgram: Future<Output = ()> + Send + 'static {}
+
+impl<P: Future<Output = ()> + Send + 'static> PlayerProgram for P {}
 
 fn get_current_time() -> f64 {
     CURRENT_TIME.with(|value| *value.borrow())
@@ -92,14 +96,14 @@ impl Drop for AudioShapeProxy {
 pub struct Player {
     num_channels: u16,
     sample_rate: usize,
-    programs: Vec<PlayerProgram>,
+    programs: Vec<PinnedPlayerProgram>,
     total_samples: usize,
     sender: Option<SyncSender<()>>,
     is_finished: bool,
 }
 
 impl Player {
-    pub fn write_wav<P: AsRef<Path>>(filename: P, program: PlayerProgram) {
+    pub fn write_wav<F: AsRef<Path>, P: PlayerProgram>(filename: F, program: P) {
         let spec = hound::WavSpec {
             channels: WAV_CHANNELS,
             sample_rate: WAV_SAMPLE_RATE,
@@ -109,7 +113,7 @@ impl Player {
         let mut writer = hound::WavWriter::create(filename, spec).unwrap();
         let mut player = Player {
             num_channels: spec.channels,
-            programs: vec![program],
+            programs: vec![Box::pin(program)],
             total_samples: 0,
             sample_rate: spec.sample_rate as usize,
             sender: None,
@@ -119,15 +123,15 @@ impl Player {
         writer.finalize().unwrap();
     }
 
-    pub fn get_stream<T: Sample>(
+    pub fn get_stream<T: Sample, P: PlayerProgram>(
         device: Device,
         config: &StreamConfig,
-        program: PlayerProgram,
+        program: P,
     ) -> PlayerProxy {
         let (sender, receiver) = sync_channel(1);
         let mut player = Player {
             num_channels: config.channels,
-            programs: vec![program],
+            programs: vec![Box::pin(program)],
             total_samples: 0,
             sample_rate: config.sample_rate.0 as usize,
             sender: Some(sender),
@@ -158,9 +162,9 @@ impl Player {
         AudioShapeProxy { id }
     }
 
-    pub fn start_program(program: PlayerProgram) {
+    pub fn start_program<P: Future<Output = ()> + Send + 'static>(program: P) {
         NEW_PROGRAMS.with(|programs| {
-            programs.borrow_mut().push(program);
+            programs.borrow_mut().push(Box::pin(program));
         });
     }
 
