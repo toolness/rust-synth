@@ -221,17 +221,17 @@ impl Player {
         }
     }
 
-    fn generate_samples<F: FnOnce(&mut RefMut<SynthRegistry>)>(
-        &mut self,
-        num_samples: usize,
-        f: F,
-    ) {
+    fn generate_samples<F: FnOnce(&mut RefMut<SynthRegistry>)>(&mut self, f: F) {
         self.execute_programs();
+        let mut num_samples = 0;
 
         CURRENT_SYNTHS.with(|registry| {
             let mut mut_registry = registry.borrow_mut();
+            let start_samples = mut_registry.get_total_samples();
 
             f(&mut mut_registry);
+
+            num_samples = mut_registry.get_total_samples() - start_samples;
             self.check_finished(&mut mut_registry);
         });
 
@@ -252,7 +252,7 @@ impl Player {
         self.init_thread_locals();
 
         while !self.is_finished {
-            self.generate_samples(num_samples, |registry| {
+            self.generate_samples(|registry| {
                 for _ in 0..num_samples {
                     let value = registry.next_sample();
                     writer.write_sample(value as f32).unwrap();
@@ -273,7 +273,7 @@ impl Player {
 
         let num_channels = self.num_channels as usize;
         for chunk in data.chunks_mut(self.samples_per_program_loop() * num_channels) {
-            self.generate_samples(chunk.len() / num_channels, |registry| {
+            self.generate_samples(|registry| {
                 // We use chunks_mut() to access individual channels:
                 // https://github.com/RustAudio/cpal/blob/master/examples/beep.rs#L127
                 for sample in chunk.chunks_mut(num_channels) {

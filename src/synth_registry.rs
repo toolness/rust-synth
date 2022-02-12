@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use crate::synth::AudioShapeSynthesizer;
 
 pub struct SynthRegistry {
+    total_samples: usize,
     latest_id: usize,
     map: HashMap<usize, AudioShapeSynthesizer>,
 }
@@ -10,6 +11,7 @@ pub struct SynthRegistry {
 impl SynthRegistry {
     pub fn new() -> Self {
         Self {
+            total_samples: 0,
             latest_id: 0,
             map: HashMap::new(),
         }
@@ -33,11 +35,16 @@ impl SynthRegistry {
         return id;
     }
 
+    pub fn get_total_samples(&self) -> usize {
+        self.total_samples
+    }
+
     pub fn next_sample(&mut self) -> f64 {
         let mut value = 0.0;
         for (_id, synth) in self.map.iter_mut() {
             value += synth.next().unwrap();
         }
+        self.total_samples += 1;
         value
     }
 
