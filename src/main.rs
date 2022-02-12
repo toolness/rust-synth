@@ -138,7 +138,7 @@ impl Instrument {
         Instrument {
             beat_counter,
             shape: Player::new_shape(AudioShape {
-                frequency: 440.0,
+                frequency: 0.0,
                 volume: 0,
             }),
             max_volume,

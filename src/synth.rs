@@ -31,8 +31,12 @@ impl Iterator for AudioShapeSynthesizer {
 
 impl AudioShapeSynthesizer {
     fn calculate_wave_delta_per_sample(sample_rate: usize, frequency: f64) -> f64 {
-        let samples_per_wave = sample_rate as f64 / frequency;
-        1.0 / samples_per_wave
+        if frequency == 0.0 {
+            0.0
+        } else {
+            let samples_per_wave = sample_rate as f64 / frequency;
+            1.0 / samples_per_wave
+        }
     }
 
     pub fn new(target: AudioShape, sample_rate: usize) -> Self {
