@@ -1,6 +1,6 @@
 const TWO_PI: f64 = 2.0 * std::f64::consts::PI;
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Default)]
 pub struct AudioShape {
     pub frequency: f64,
     pub volume: u8,

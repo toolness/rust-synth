@@ -137,10 +137,7 @@ impl Instrument {
     fn new(beat_counter: BeatCounter, max_volume: u8) -> Self {
         Instrument {
             beat_counter,
-            shape: Player::new_shape(AudioShape {
-                frequency: 0.0,
-                volume: 0,
-            }),
+            shape: Player::new_shape(AudioShape::default()),
             max_volume,
         }
     }
