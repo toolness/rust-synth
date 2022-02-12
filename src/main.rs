@@ -24,7 +24,7 @@ use synth::AudioShape;
 struct Args {
     #[clap(subcommand)]
     command: Commands,
-    #[clap(long, short = 'o')]
+    #[clap(long, short = 'o', global = true)]
     /// Output to WAV or MP3 file (MP3 requires ffmpeg).
     output: Option<String>,
 }
