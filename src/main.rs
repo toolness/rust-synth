@@ -1,6 +1,6 @@
 use std::process::Command;
 
-use beat::{Beat, BeatCounter, FOUR_FOUR};
+use beat::{Beat, BeatSettings, FOUR_FOUR};
 use clap::{AppSettings, ArgEnum, Parser, Subcommand};
 use cpal::traits::{DeviceTrait, HostTrait};
 use cpal::SampleFormat;
@@ -129,14 +129,14 @@ fn build_stream<P: PlayerProgram>(program: P) -> PlayerProxy {
 }
 
 async fn chord_program() {
-    let beats = BeatCounter::new(60, FOUR_FOUR);
+    let beats = BeatSettings::new(60, FOUR_FOUR);
     let mut hand = Instrument::new(beats, 63);
 
     hand.play_chord(&["C4", "E4", "G4"], Beat::Whole).await;
 }
 
 async fn captain_silver_program() {
-    let beats = BeatCounter::new(120, FOUR_FOUR);
+    let beats = BeatSettings::new(120, FOUR_FOUR);
 
     let right_hand = async move {
         let mut hand = Instrument::new(beats, 63);
@@ -264,7 +264,7 @@ async fn scale_program(tonic: MidiNote, scale: Scale, bpm: u64, octaves: bool) {
 }
 
 async fn play_scale(tonic: MidiNote, scale: Scale, bpm: u64) {
-    let beat_counter = BeatCounter::new(bpm, FOUR_FOUR);
+    let beat_settings = BeatSettings::new(bpm, FOUR_FOUR);
     let mut note: MidiNote = tonic;
     let mut shape = Player::new_shape(AudioShape {
         frequency: note.frequency(),
@@ -276,7 +276,7 @@ async fn play_scale(tonic: MidiNote, scale: Scale, bpm: u64) {
         Scale::MinorHarmonic => MINOR_HARMONIC_SCALE,
     };
 
-    let ms_per_quarter_note = beat_counter.duration_in_millis(Beat::Quarter);
+    let ms_per_quarter_note = beat_settings.duration_in_millis(Beat::Quarter);
 
     for semitones in base_scale
         .iter()

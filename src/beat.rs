@@ -44,18 +44,16 @@ impl TimeSignature {
 }
 
 #[derive(Copy, Clone)]
-pub struct BeatCounter {
-    bpm: u64,
-    time_signature: TimeSignature,
-    sixty_fourth_beats: u64,
+pub struct BeatSettings {
+    pub bpm: u64,
+    pub time_signature: TimeSignature,
 }
 
-impl BeatCounter {
+impl BeatSettings {
     pub fn new(bpm: u64, time_signature: TimeSignature) -> Self {
-        BeatCounter {
+        Self {
             bpm,
             time_signature,
-            sixty_fourth_beats: 0,
         }
     }
 
@@ -70,16 +68,39 @@ impl BeatCounter {
         let ms_per_beat = beats_per_second * 1000.0;
         ms_per_beat * self.beats_in_duration(length)
     }
+}
 
-    pub fn increment(&mut self, length: Beat) {
+#[derive(Copy, Clone)]
+pub struct BeatCounter {
+    settings: BeatSettings,
+    sixty_fourth_beats: u64,
+}
+
+impl BeatCounter {
+    pub fn new(settings: BeatSettings) -> Self {
+        BeatCounter {
+            settings,
+            sixty_fourth_beats: 0,
+        }
+    }
+
+    /// Increment the counter by the given length, returning the
+    /// length's duration in milliseconds.
+    pub fn increment(&mut self, length: Beat) -> f64 {
         self.sixty_fourth_beats += length.sixty_fourth_beats();
+        self.settings.duration_in_millis(length)
     }
 
     pub fn total_beats(&self) -> f64 {
-        self.sixty_fourth_beats as f64 / self.time_signature.beat_unit().sixty_fourth_beats() as f64
+        self.sixty_fourth_beats as f64
+            / self
+                .settings
+                .time_signature
+                .beat_unit()
+                .sixty_fourth_beats() as f64
     }
 
     pub fn total_measures(&self) -> f64 {
-        self.total_beats() / self.time_signature.beats_per_measure() as f64
+        self.total_beats() / self.settings.time_signature.beats_per_measure() as f64
     }
 }

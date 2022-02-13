@@ -1,5 +1,5 @@
 use crate::{
-    beat::{Beat, BeatCounter},
+    beat::{Beat, BeatCounter, BeatSettings},
     note::MidiNoteLike,
     player::{AudioShapeProxy, Player},
     synth::AudioShape,
@@ -16,9 +16,9 @@ pub struct Instrument {
 }
 
 impl Instrument {
-    pub fn new(beat_counter: BeatCounter, max_volume: u8) -> Self {
+    pub fn new(beat_settings: BeatSettings, max_volume: u8) -> Self {
         Instrument {
-            beat_counter,
+            beat_counter: BeatCounter::new(beat_settings),
             shape: Player::new_shape(AudioShape::default()),
             max_volume,
         }
@@ -28,12 +28,11 @@ impl Instrument {
         self.shape
             .set_frequency(note.into_midi_note_or_panic().frequency());
         self.shape.set_volume(self.max_volume);
-        Player::wait(self.beat_counter.duration_in_millis(length) - release_ms).await;
+        Player::wait(self.beat_counter.increment(length) - release_ms).await;
         if release_ms > 0.0 {
             self.shape.set_volume(0);
-            Player::wait(PAUSE_MS).await;
+            Player::wait(release_ms).await;
         }
-        self.beat_counter.increment(length);
     }
 
     pub async fn play_note<N: MidiNoteLike>(&mut self, note: N, length: Beat) {
@@ -58,8 +57,7 @@ impl Instrument {
 
     pub async fn rest(&mut self, length: Beat) {
         self.shape.set_volume(0);
-        Player::wait(self.beat_counter.duration_in_millis(length)).await;
-        self.beat_counter.increment(length);
+        Player::wait(self.beat_counter.increment(length)).await;
     }
 
     pub fn total_measures(&self) -> f64 {
