@@ -24,22 +24,24 @@ impl Instrument {
         }
     }
 
-    pub async fn play_note<N: MidiNoteLike>(&mut self, note: N, length: Beat) {
+    async fn play_note_impl<N: MidiNoteLike>(&mut self, note: N, length: Beat, release_ms: f64) {
         let ms = self.beat_counter.duration_in_millis(length);
         self.shape
             .set_frequency(note.into_midi_note_or_panic().frequency());
         self.shape.set_volume(self.max_volume);
-        Player::wait(ms - PAUSE_MS).await;
-        self.shape.set_volume(0);
-        Player::wait(PAUSE_MS).await;
+        Player::wait(ms - release_ms).await;
+        if release_ms > 0.0 {
+            self.shape.set_volume(0);
+            Player::wait(PAUSE_MS).await;
+        }
+    }
+
+    pub async fn play_note<N: MidiNoteLike>(&mut self, note: N, length: Beat) {
+        self.play_note_impl(note, length, PAUSE_MS).await;
     }
 
     pub async fn play_note_without_release<N: MidiNoteLike>(&mut self, note: N, length: Beat) {
-        let ms = self.beat_counter.duration_in_millis(length);
-        self.shape
-            .set_frequency(note.into_midi_note_or_panic().frequency());
-        self.shape.set_volume(self.max_volume);
-        Player::wait(ms).await;
+        self.play_note_impl(note, length, 0.0).await;
     }
 
     pub async fn play_chord<N: MidiNoteLike>(&mut self, notes: &[N], length: Beat) {
