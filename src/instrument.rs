@@ -25,11 +25,10 @@ impl Instrument {
     }
 
     async fn play_note_impl<N: MidiNoteLike>(&mut self, note: N, length: Beat, release_ms: f64) {
-        let ms = self.beat_counter.duration_in_millis(length);
         self.shape
             .set_frequency(note.into_midi_note_or_panic().frequency());
         self.shape.set_volume(self.max_volume);
-        Player::wait(ms - release_ms).await;
+        Player::wait(self.beat_counter.duration_in_millis(length) - release_ms).await;
         if release_ms > 0.0 {
             self.shape.set_volume(0);
             Player::wait(PAUSE_MS).await;
@@ -57,8 +56,7 @@ impl Instrument {
     }
 
     pub async fn rest(&mut self, length: Beat) {
-        let ms = self.beat_counter.duration_in_millis(length);
         self.shape.set_volume(0);
-        Player::wait(ms).await;
+        Player::wait(self.beat_counter.duration_in_millis(length)).await;
     }
 }
