@@ -93,6 +93,15 @@ impl AudioShapeProxy {
     }
 }
 
+impl Clone for AudioShapeProxy {
+    fn clone(&self) -> Self {
+        let shape = CURRENT_SYNTHS
+            .with(|registry| registry.borrow_mut().get_shape(&self.id))
+            .unwrap();
+        Self::new(shape)
+    }
+}
+
 impl Drop for AudioShapeProxy {
     fn drop(&mut self) {
         CURRENT_SYNTHS.with(|registry| {

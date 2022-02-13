@@ -13,7 +13,7 @@ mod synth;
 mod synth_registry;
 mod waiter;
 
-use note::{MidiNote, MAJOR_SCALE, MINOR_HARMONIC_SCALE, OCTAVE};
+use note::{MidiNote, MidiNoteLike, MAJOR_SCALE, MINOR_HARMONIC_SCALE, OCTAVE};
 use player::{AudioShapeProxy, Player, PlayerProgram, PlayerProxy, WAV_CHANNELS, WAV_SAMPLE_RATE};
 use synth::AudioShape;
 
@@ -48,6 +48,8 @@ enum Commands {
     Siren {},
     /// Plays the song "Captain Silver" from pg. 21 of Schaum's Red Book (Alfred).
     CaptainSilver {},
+    /// Plays a chord.
+    Chord {},
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, ArgEnum)]
@@ -127,6 +129,7 @@ fn build_stream<P: PlayerProgram>(program: P) -> PlayerProxy {
 // Amount of time to pause between notes (when not slurring)
 const PAUSE_MS: f64 = 50.0;
 
+#[derive(Clone)]
 struct Instrument {
     beat_counter: BeatCounter,
     shape: AudioShapeProxy,
@@ -142,10 +145,10 @@ impl Instrument {
         }
     }
 
-    async fn play_note(&mut self, note: &str, length: Beat) {
+    async fn play_note<N: MidiNoteLike>(&mut self, note: N, length: Beat) {
         let ms = self.beat_counter.duration_in_millis(length);
-        let note = MidiNote::try_from(note).unwrap();
-        self.shape.set_frequency(note.frequency());
+        self.shape
+            .set_frequency(note.into_midi_note_or_panic().frequency());
         self.shape.set_volume(self.max_volume);
         Player::wait(ms - PAUSE_MS).await;
         self.shape.set_volume(0);
@@ -160,11 +163,34 @@ impl Instrument {
         Player::wait(ms).await;
     }
 
+    async fn play_chord(&mut self, notes: &[&str], length: Beat) {
+        for note in notes.iter().skip(1) {
+            let mut instrument = self.clone();
+            let midi_note = (*note).into_midi_note_or_panic();
+            Player::start_program(async move {
+                instrument.play_note(midi_note, length).await;
+            });
+        }
+        let first_note = (*notes.get(0).unwrap()).into_midi_note_or_panic();
+        self.play_note(first_note, length).await;
+    }
+
     async fn rest(&mut self, length: Beat) {
         let ms = self.beat_counter.duration_in_millis(length);
         self.shape.set_volume(0);
         Player::wait(ms).await;
     }
+}
+
+async fn chord_program() {
+    let beats = BeatCounter {
+        bpm: 60,
+        time_signature: TimeSignature(4, Beat::Quarter),
+    };
+
+    let mut hand = Instrument::new(beats, 63);
+
+    hand.play_chord(&["C4", "E4", "G4"], Beat::Whole).await;
 }
 
 async fn captain_silver_program() {
@@ -328,7 +354,10 @@ async fn play_scale(tonic: MidiNote, scale: Scale, bpm: u64) {
 fn main() {
     let cli = Args::parse();
     match &cli.command {
-        &Commands::CaptainSilver {} => {
+        Commands::Chord {} => {
+            cli.run_program(chord_program());
+        }
+        Commands::CaptainSilver {} => {
             cli.run_program(captain_silver_program());
         }
         Commands::Siren {} => {

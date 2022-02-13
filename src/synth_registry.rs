@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::synth::AudioShapeSynthesizer;
+use crate::synth::{AudioShape, AudioShapeSynthesizer};
 
 pub struct SynthRegistry {
     total_samples: usize,
@@ -33,6 +33,10 @@ impl SynthRegistry {
         let prev_value = self.map.insert(id, synth);
         assert!(prev_value.is_none());
         return id;
+    }
+
+    pub fn get_shape(&self, id: &usize) -> Option<AudioShape> {
+        self.map.get(id).map(|synth| synth.get_target())
     }
 
     pub fn get_total_samples(&self) -> usize {

@@ -14,6 +14,16 @@ pub const MAJOR_SCALE: [Semitones; 7] = [TONE, TONE, SEMITONE, TONE, TONE, TONE,
 pub const MINOR_HARMONIC_SCALE: [Semitones; 7] =
     [TONE, SEMITONE, TONE, TONE, SEMITONE, Semitones(3), SEMITONE];
 
+pub trait MidiNoteLike: TryInto<MidiNote> {
+    fn into_midi_note_or_panic(self) -> MidiNote;
+}
+
+impl<T: TryInto<MidiNote, Error = E>, E: std::fmt::Debug> MidiNoteLike for T {
+    fn into_midi_note_or_panic(self) -> MidiNote {
+        self.try_into().unwrap()
+    }
+}
+
 #[derive(Copy, Clone, PartialEq, Debug)]
 pub struct MidiNote(i8);
 
