@@ -33,6 +33,7 @@ impl Instrument {
             self.shape.set_volume(0);
             Player::wait(PAUSE_MS).await;
         }
+        self.beat_counter.increment(length);
     }
 
     pub async fn play_note<N: MidiNoteLike>(&mut self, note: N, length: Beat) {
@@ -58,5 +59,10 @@ impl Instrument {
     pub async fn rest(&mut self, length: Beat) {
         self.shape.set_volume(0);
         Player::wait(self.beat_counter.duration_in_millis(length)).await;
+        self.beat_counter.increment(length);
+    }
+
+    pub fn total_measures(&self) -> f64 {
+        self.beat_counter.total_measures()
     }
 }
