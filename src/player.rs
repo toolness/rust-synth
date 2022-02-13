@@ -60,6 +60,16 @@ pub struct AudioShapeProxy {
 }
 
 impl AudioShapeProxy {
+    fn new(shape: AudioShape) -> Self {
+        let sample_rate = CURRENT_SAMPLE_RATE.with(|value| value.borrow().unwrap());
+        let id = CURRENT_SYNTHS.with(|registry| {
+            let mut mut_registry = registry.borrow_mut();
+            let synth = AudioShapeSynthesizer::new(shape, sample_rate);
+            return mut_registry.insert(synth);
+        });
+        AudioShapeProxy { id }
+    }
+
     pub fn set_frequency(&mut self, frequency: f64) {
         CURRENT_SYNTHS.with(|registry| {
             registry.borrow_mut().modify(self.id, |synth| {
@@ -153,13 +163,7 @@ impl Player {
     }
 
     pub fn new_shape(shape: AudioShape) -> AudioShapeProxy {
-        let sample_rate = CURRENT_SAMPLE_RATE.with(|value| value.borrow().unwrap());
-        let id = CURRENT_SYNTHS.with(|registry| {
-            let mut mut_registry = registry.borrow_mut();
-            let synth = AudioShapeSynthesizer::new(shape, sample_rate);
-            return mut_registry.insert(synth);
-        });
-        AudioShapeProxy { id }
+        AudioShapeProxy::new(shape)
     }
 
     pub fn start_program<P: Future<Output = ()> + Send + 'static>(program: P) {
