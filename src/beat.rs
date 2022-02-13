@@ -6,6 +6,8 @@ pub enum Beat {
     Quarter,
     Eighth,
     Sixteenth,
+    ThirtySecond,
+    SixtyFourth,
 }
 
 impl Beat {
@@ -16,6 +18,8 @@ impl Beat {
             Beat::Quarter => 4,
             Beat::Eighth => 8,
             Beat::Sixteenth => 16,
+            Beat::ThirtySecond => 32,
+            Beat::SixtyFourth => 64,
         }
     }
 }
