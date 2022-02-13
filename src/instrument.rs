@@ -13,6 +13,7 @@ pub struct Instrument {
     beat_counter: BeatCounter,
     shape: AudioShapeProxy,
     max_volume: u8,
+    start_time: f64,
 }
 
 impl Instrument {
@@ -21,6 +22,29 @@ impl Instrument {
             beat_counter: BeatCounter::new(beat_settings),
             shape: Player::new_shape(AudioShape::default()),
             max_volume,
+            start_time: Player::current_time(),
+        }
+    }
+
+    async fn wait_for_beat(&mut self, length: Beat, offset: f64) {
+        let mut final_offset = offset;
+        if self.beat_counter.total_measures().fract() == 0.0 {
+            // The way our algorithm currently works, we're bound to
+            // slowly veer off our ideal timeline due to rounding
+            // errors, which can make different audio tracks become
+            // out-of-sync with each other.
+            //
+            // To compensate for this, at the beginning of
+            // every measure we'll try to re-sync ourselves with
+            // where we're supposed to be.
+            let total_millis = self.beat_counter.total_millis();
+            let millis_passed = Player::current_time() - self.start_time;
+            let delta = total_millis - millis_passed;
+            final_offset += delta;
+        }
+        let ms = self.beat_counter.increment(length) + final_offset;
+        if ms > 0.0 {
+            Player::wait(ms).await;
         }
     }
 
@@ -28,7 +52,7 @@ impl Instrument {
         self.shape
             .set_frequency(note.into_midi_note_or_panic().frequency());
         self.shape.set_volume(self.max_volume);
-        Player::wait(self.beat_counter.increment(length) - release_ms).await;
+        self.wait_for_beat(length, -release_ms).await;
         if release_ms > 0.0 {
             self.shape.set_volume(0);
             Player::wait(release_ms).await;
@@ -57,7 +81,7 @@ impl Instrument {
 
     pub async fn rest(&mut self, length: Beat) {
         self.shape.set_volume(0);
-        Player::wait(self.beat_counter.increment(length)).await;
+        self.wait_for_beat(length, 0.0).await;
     }
 
     pub fn total_measures(&self) -> f64 {

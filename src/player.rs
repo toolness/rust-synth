@@ -167,6 +167,10 @@ impl Player {
         return PlayerProxy { stream, receiver };
     }
 
+    pub fn current_time() -> f64 {
+        get_current_time()
+    }
+
     pub fn wait(ms: f64) -> impl Future<Output = ()> {
         Waiter::new(ms, get_current_time)
     }
