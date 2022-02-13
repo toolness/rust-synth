@@ -1,3 +1,5 @@
+pub const FOUR_FOUR: TimeSignature = TimeSignature(4, Beat::Quarter);
+
 #[derive(Debug, Copy, Clone)]
 #[allow(dead_code)]
 pub enum Beat {
@@ -40,11 +42,18 @@ impl TimeSignature {
 
 #[derive(Copy, Clone)]
 pub struct BeatCounter {
-    pub bpm: u64,
-    pub time_signature: TimeSignature,
+    bpm: u64,
+    time_signature: TimeSignature,
 }
 
 impl BeatCounter {
+    pub fn new(bpm: u64, time_signature: TimeSignature) -> Self {
+        BeatCounter {
+            bpm,
+            time_signature,
+        }
+    }
+
     pub fn beats(&self, length: Beat) -> f64 {
         let beat_unit_divisor = self.time_signature.beat_unit().divisor();
         let length_divisor = length.divisor();
