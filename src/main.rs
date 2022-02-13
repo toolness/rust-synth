@@ -155,10 +155,10 @@ impl Instrument {
         Player::wait(PAUSE_MS).await;
     }
 
-    async fn play_note_without_release(&mut self, note: &str, length: Beat) {
+    async fn play_note_without_release<N: MidiNoteLike>(&mut self, note: N, length: Beat) {
         let ms = self.beat_counter.duration_in_millis(length);
-        let note = MidiNote::try_from(note).unwrap();
-        self.shape.set_frequency(note.frequency());
+        self.shape
+            .set_frequency(note.into_midi_note_or_panic().frequency());
         self.shape.set_volume(self.max_volume);
         Player::wait(ms).await;
     }
