@@ -173,10 +173,7 @@ async fn captain_silver_program() {
         hand.play_note_without_release("C4", Beat::Whole).await;
         hand.play_note("C4", Beat::Whole).await;
 
-        println!(
-            "Right hand finished playing {} measures.",
-            hand.total_measures()
-        );
+        assert_eq!(hand.total_measures(), 16.0);
     };
 
     let left_hand = async move {
@@ -239,10 +236,7 @@ async fn captain_silver_program() {
         }
         hand.play_note("C3", Beat::Whole).await;
 
-        println!(
-            "Left hand finished playing {} measures.",
-            hand.total_measures()
-        );
+        assert_eq!(hand.total_measures(), 16.0);
     };
 
     Player::start_program(right_hand);
