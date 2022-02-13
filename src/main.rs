@@ -163,7 +163,7 @@ impl Instrument {
         Player::wait(ms).await;
     }
 
-    async fn play_chord(&mut self, notes: &[&str], length: Beat) {
+    async fn play_chord<N: MidiNoteLike>(&mut self, notes: &[N], length: Beat) {
         for note in notes.iter().skip(1) {
             let mut instrument = self.clone();
             let midi_note = (*note).into_midi_note_or_panic();
