@@ -50,8 +50,8 @@ enum Commands {
     Siren {},
     /// Plays the song "Captain Silver" from pg. 21 of Schaum's Red Book (Alfred).
     CaptainSilver {},
-    /// Plays a chord.
-    Chord {},
+    /// Plays the song "Tune of the Tuna Fish" from pg. 29 of Schaum's Red Book (Alfred).
+    Tuna {},
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, ArgEnum)]
@@ -128,11 +128,54 @@ fn build_stream<P: PlayerProgram>(program: P) -> PlayerProxy {
     }
 }
 
-async fn chord_program() {
-    let beats = BeatSettings::new(60, FOUR_FOUR);
-    let mut hand = Instrument::new(beats, 63);
+async fn tuna_program() {
+    let beats = BeatSettings::new(80, FOUR_FOUR);
 
-    hand.play_chord(&["C4", "E4", "G4"], Beat::Whole).await;
+    let right_hand = async move {
+        let mut hand = Instrument::new(beats, 63);
+
+        // Measures 1-4
+        hand.play_note("C5", Beat::Quarter).await;
+        hand.play_note("A4", Beat::Quarter).await;
+        hand.play_note("A4", Beat::Half).await;
+
+        hand.play_note("Bb4", Beat::Quarter).await;
+        hand.play_note("G4", Beat::Quarter).await;
+        hand.play_note("G4", Beat::Half).await;
+
+        hand.play_note("F4", Beat::Quarter).await;
+        hand.play_note("G4", Beat::Quarter).await;
+        hand.play_note("A4", Beat::Quarter).await;
+        hand.play_note("Bb4", Beat::Quarter).await;
+
+        hand.play_note("C5", Beat::Quarter).await;
+        hand.play_note("C5", Beat::Quarter).await;
+        hand.play_note("C5", Beat::Half).await;
+
+        assert_eq!(hand.total_measures(), 4.0);
+    };
+
+    let left_hand = async move {
+        let mut hand = Instrument::new(beats, 63);
+
+        // Measures 1-4
+        hand.play_note("F3", Beat::Half).await;
+        hand.play_chord(&["A3", "C4"], Beat::Half).await;
+
+        hand.play_note("G3", Beat::Half).await;
+        hand.play_chord(&["Bb3", "C4"], Beat::Half).await;
+
+        hand.play_note("F3", Beat::Half).await;
+        hand.play_chord(&["A3", "C4"], Beat::Half).await;
+
+        hand.play_note("F3", Beat::Half).await;
+        hand.play_chord(&["A3", "C4"], Beat::Half).await;
+
+        assert_eq!(hand.total_measures(), 4.0);
+    };
+
+    Player::start_program(right_hand);
+    Player::start_program(left_hand);
 }
 
 async fn captain_silver_program() {
@@ -294,11 +337,11 @@ async fn play_scale(tonic: MidiNote, scale: Scale, bpm: u64) {
 fn main() {
     let cli = Args::parse();
     match &cli.command {
-        Commands::Chord {} => {
-            cli.run_program(chord_program());
-        }
         Commands::CaptainSilver {} => {
             cli.run_program(captain_silver_program());
+        }
+        Commands::Tuna {} => {
+            cli.run_program(tuna_program());
         }
         Commands::Siren {} => {
             cli.run_program(siren_program());
