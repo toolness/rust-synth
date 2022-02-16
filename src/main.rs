@@ -134,14 +134,18 @@ async fn tuna_program() {
     let right_hand = async move {
         let mut hand = Instrument::new(beats, 63);
 
-        // Measures 1-4
-        hand.play_note("C5", Beat::Quarter).await;
-        hand.play_note("A4", Beat::Quarter).await;
-        hand.play_note("A4", Beat::Half).await;
+        async fn tuna_fish_tuna_fish(hand: &mut Instrument) {
+            hand.play_note("C5", Beat::Quarter).await;
+            hand.play_note("A4", Beat::Quarter).await;
+            hand.play_note("A4", Beat::Half).await;
 
-        hand.play_note("Bb4", Beat::Quarter).await;
-        hand.play_note("G4", Beat::Quarter).await;
-        hand.play_note("G4", Beat::Half).await;
+            hand.play_note("Bb4", Beat::Quarter).await;
+            hand.play_note("G4", Beat::Quarter).await;
+            hand.play_note("G4", Beat::Half).await;
+        }
+
+        // Measures 1-4
+        tuna_fish_tuna_fish(&mut hand).await;
 
         hand.play_note("F4", Beat::Quarter).await;
         hand.play_note("G4", Beat::Quarter).await;
@@ -158,12 +162,16 @@ async fn tuna_program() {
     let left_hand = async move {
         let mut hand = Instrument::new(beats, 63);
 
-        // Measures 1-4
-        hand.play_note("F3", Beat::Half).await;
-        hand.play_chord(&["A3", "C4"], Beat::Half).await;
+        async fn tuna_fish_tuna_fish(hand: &mut Instrument) {
+            hand.play_note("F3", Beat::Half).await;
+            hand.play_chord(&["A3", "C4"], Beat::Half).await;
 
-        hand.play_note("G3", Beat::Half).await;
-        hand.play_chord(&["Bb3", "C4"], Beat::Half).await;
+            hand.play_note("G3", Beat::Half).await;
+            hand.play_chord(&["Bb3", "C4"], Beat::Half).await;
+        }
+
+        // Measures 1-4
+        tuna_fish_tuna_fish(&mut hand).await;
 
         hand.play_note("F3", Beat::Half).await;
         hand.play_chord(&["A3", "C4"], Beat::Half).await;
