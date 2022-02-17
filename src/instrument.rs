@@ -1,3 +1,5 @@
+use std::sync::{Arc, Mutex};
+
 use crate::{
     beat::{Beat, BeatCounter, BeatSettings},
     note::MidiNoteLike,
@@ -11,7 +13,7 @@ const PAUSE_MS: f64 = 50.0;
 #[derive(Clone)]
 pub struct Instrument {
     beat_counter: BeatCounter,
-    shape: AudioShapeProxy,
+    shape: Arc<Mutex<AudioShapeProxy>>,
     max_volume: u8,
     start_time: f64,
 }
@@ -20,9 +22,20 @@ impl Instrument {
     pub fn new(beat_settings: BeatSettings, max_volume: u8) -> Self {
         Instrument {
             beat_counter: BeatCounter::new(beat_settings),
-            shape: Player::new_shape(AudioShape::default()),
+            shape: Arc::new(Mutex::new(Player::new_shape(AudioShape::default()))),
             max_volume,
             start_time: Player::current_time(),
+        }
+    }
+
+    fn duplicate(&self) -> Self {
+        let cloned_shape = self.shape.try_lock().unwrap().clone();
+        let shape = Arc::new(Mutex::new(cloned_shape));
+        Instrument {
+            beat_counter: self.beat_counter,
+            shape,
+            max_volume: self.max_volume,
+            start_time: self.start_time,
         }
     }
 
@@ -49,12 +62,14 @@ impl Instrument {
     }
 
     async fn play_note_impl<N: MidiNoteLike>(&mut self, note: N, length: Beat, release_ms: f64) {
-        self.shape
-            .set_frequency(note.into_midi_note_or_panic().frequency());
-        self.shape.set_volume(self.max_volume);
+        {
+            let mut shape = self.shape.try_lock().unwrap();
+            shape.set_frequency(note.into_midi_note_or_panic().frequency());
+            shape.set_volume(self.max_volume);
+        }
         self.wait_for_beat(length, -release_ms).await;
         if release_ms > 0.0 {
-            self.shape.set_volume(0);
+            self.shape.try_lock().unwrap().set_volume(0);
             Player::wait(release_ms).await;
         }
     }
@@ -69,7 +84,7 @@ impl Instrument {
 
     pub async fn play_chord<N: MidiNoteLike>(&mut self, notes: &[N], length: Beat) {
         for note in notes.iter().skip(1) {
-            let mut instrument = self.clone();
+            let mut instrument = self.duplicate();
             let midi_note = (*note).into_midi_note_or_panic();
             Player::start_program(async move {
                 instrument.play_note(midi_note, length).await;
@@ -80,7 +95,7 @@ impl Instrument {
     }
 
     pub async fn rest(&mut self, length: Beat) {
-        self.shape.set_volume(0);
+        self.shape.try_lock().unwrap().set_volume(0);
         self.wait_for_beat(length, 0.0).await;
     }
 
