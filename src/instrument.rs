@@ -39,6 +39,11 @@ impl Instrument {
         }
     }
 
+    pub fn sync_beats_with(&mut self, other: &Instrument) {
+        self.beat_counter = other.beat_counter;
+        self.start_time = other.start_time;
+    }
+
     async fn wait_for_beat(&mut self, length: Beat, offset: f64) {
         let mut final_offset = offset;
         if self.beat_counter.total_measures().fract() == 0.0 {
