@@ -12,7 +12,7 @@ const PAUSE_MS: f64 = 50.0;
 
 #[derive(Clone)]
 pub struct Instrument {
-    beat_counter: BeatCounter,
+    beat_counter: Arc<Mutex<BeatCounter>>,
     shape: Arc<Mutex<AudioShapeProxy>>,
     max_volume: u8,
     start_time: f64,
@@ -21,7 +21,7 @@ pub struct Instrument {
 impl Instrument {
     pub fn new(beat_settings: BeatSettings, max_volume: u8) -> Self {
         Instrument {
-            beat_counter: BeatCounter::new(beat_settings),
+            beat_counter: Arc::new(Mutex::new(BeatCounter::new(beat_settings))),
             shape: Arc::new(Mutex::new(Player::new_shape(AudioShape::default()))),
             max_volume,
             start_time: Player::current_time(),
@@ -31,36 +31,36 @@ impl Instrument {
     fn duplicate(&self) -> Self {
         let cloned_shape = self.shape.try_lock().unwrap().clone();
         let shape = Arc::new(Mutex::new(cloned_shape));
+        let cloned_beat_counter = self.beat_counter.try_lock().unwrap().clone();
+        let beat_counter = Arc::new(Mutex::new(cloned_beat_counter));
         Instrument {
-            beat_counter: self.beat_counter,
+            beat_counter,
             shape,
             max_volume: self.max_volume,
             start_time: self.start_time,
         }
     }
 
-    pub fn sync_beats_with(&mut self, other: &Instrument) {
-        self.beat_counter = other.beat_counter;
-        self.start_time = other.start_time;
-    }
-
     async fn wait_for_beat(&mut self, length: Beat, offset: f64) {
         let mut final_offset = offset;
-        if self.beat_counter.total_measures().fract() == 0.0 {
-            // The way our algorithm currently works, we're bound to
-            // slowly veer off our ideal timeline due to rounding
-            // errors, which can make different audio tracks become
-            // out-of-sync with each other.
-            //
-            // To compensate for this, at the beginning of
-            // every measure we'll try to re-sync ourselves with
-            // where we're supposed to be.
-            let total_millis = self.beat_counter.total_millis();
-            let millis_passed = Player::current_time() - self.start_time;
-            let delta = total_millis - millis_passed;
-            final_offset += delta;
-        }
-        let ms = self.beat_counter.increment(length) + final_offset;
+        let ms = {
+            let mut beat_counter = self.beat_counter.try_lock().unwrap();
+            if beat_counter.total_measures().fract() == 0.0 {
+                // The way our algorithm currently works, we're bound to
+                // slowly veer off our ideal timeline due to rounding
+                // errors, which can make different audio tracks become
+                // out-of-sync with each other.
+                //
+                // To compensate for this, at the beginning of
+                // every measure we'll try to re-sync ourselves with
+                // where we're supposed to be.
+                let total_millis = beat_counter.total_millis();
+                let millis_passed = Player::current_time() - self.start_time;
+                let delta = total_millis - millis_passed;
+                final_offset += delta;
+            }
+            beat_counter.increment(length) + final_offset
+        };
         if ms > 0.0 {
             Player::wait(ms).await;
         }
@@ -105,6 +105,6 @@ impl Instrument {
     }
 
     pub fn total_measures(&self) -> f64 {
-        self.beat_counter.total_measures()
+        self.beat_counter.try_lock().unwrap().total_measures()
     }
 }

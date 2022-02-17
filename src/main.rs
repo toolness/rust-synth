@@ -151,8 +151,6 @@ async fn tuna_program() {
         right_hand.play_note("Bb4", Beat::Quarter).await;
         right_hand.play_note("G4", Beat::Quarter).await;
         right_hand.play_note("G4", Beat::Half).await;
-
-        left_hand.sync_beats_with(right_hand);
     }
 
     async fn sing_a_tune_of_tuna_fish(right_hand: &mut Instrument, left_hand: &mut Instrument) {
@@ -174,8 +172,6 @@ async fn tuna_program() {
         right_hand.play_note("C5", Beat::Quarter).await;
         right_hand.play_note("C5", Beat::Quarter).await;
         right_hand.play_note("C5", Beat::Half).await;
-
-        left_hand.sync_beats_with(&right_hand);
     }
 
     tuna_fish_tuna_fish(&mut right_hand, &mut left_hand).await;
