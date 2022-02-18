@@ -170,11 +170,67 @@ async fn tuna_program() {
         right_hand.play_note("C5", Beat::Half).await;
     }
 
+    async fn its_a_favrite_dish(mut right_hand: Instrument, mut left_hand: Instrument) {
+        Player::start_program(async move {
+            left_hand.play_note("A3", Beat::Half).await;
+            left_hand.play_chord(&["G3", "Bb3"], Beat::Half).await;
+
+            left_hand.play_chord(&["F3", "A3"], Beat::Whole).await;
+        });
+
+        right_hand.play_note("F4", Beat::Quarter).await;
+        right_hand.play_note("A4", Beat::Quarter).await;
+        right_hand.play_note("C5", Beat::Quarter).await;
+        right_hand.play_note("C5", Beat::Quarter).await;
+
+        right_hand.play_note("F4", Beat::Whole).await;
+    }
+
+    async fn evrybody_likes_it_so(mut right_hand: Instrument, mut left_hand: Instrument) {
+        Player::start_program(async move {
+            for _ in 0..2 {
+                left_hand.play_note("G3", Beat::Half).await;
+                left_hand.play_chord(&["Bb3", "C4"], Beat::Half).await;
+            }
+        });
+
+        for _ in 0..5 {
+            right_hand.play_note("G4", Beat::Quarter).await;
+        }
+
+        right_hand.play_note("A4", Beat::Quarter).await;
+        right_hand.play_note("Bb4", Beat::Half).await;
+    }
+
+    async fn from_new_york_to_kokomo(mut right_hand: Instrument, mut left_hand: Instrument) {
+        Player::start_program(async move {
+            for _ in 0..5 {
+                left_hand.play_note("A3", Beat::Quarter).await;
+            }
+
+            left_hand.play_note("Bb3", Beat::Quarter).await;
+            left_hand.play_note("C4", Beat::Half).await;
+        });
+
+        for _ in 0..2 {
+            right_hand.play_chord(&["F4", "C5"], Beat::Whole).await;
+        }
+    }
+
     tuna_fish_tuna_fish(right_hand.clone(), left_hand.clone()).await;
     sing_a_tune_of_tuna_fish(right_hand.clone(), left_hand.clone()).await;
 
-    assert_eq!(right_hand.total_measures(), 4.0);
-    assert_eq!(left_hand.total_measures(), 4.0);
+    tuna_fish_tuna_fish(right_hand.clone(), left_hand.clone()).await;
+    its_a_favrite_dish(right_hand.clone(), left_hand.clone()).await;
+
+    evrybody_likes_it_so(right_hand.clone(), left_hand.clone()).await;
+    from_new_york_to_kokomo(right_hand.clone(), left_hand.clone()).await;
+
+    tuna_fish_tuna_fish(right_hand.clone(), left_hand.clone()).await;
+    its_a_favrite_dish(right_hand.clone(), left_hand.clone()).await;
+
+    assert_eq!(right_hand.total_measures(), 16.0);
+    assert_eq!(left_hand.total_measures(), 16.0);
 }
 
 async fn captain_silver_program() {
