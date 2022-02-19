@@ -1,7 +1,19 @@
 const TWO_PI: f64 = 2.0 * std::f64::consts::PI;
 
+#[derive(Copy, Clone)]
+pub enum Waveform {
+    Sine,
+}
+
+impl Default for Waveform {
+    fn default() -> Self {
+        Waveform::Sine
+    }
+}
+
 #[derive(Copy, Clone, Default)]
 pub struct AudioShape {
+    pub waveform: Waveform,
     pub frequency: f64,
     pub volume: u8,
 }
@@ -20,7 +32,7 @@ impl Iterator for AudioShapeSynthesizer {
 
     fn next(&mut self) -> Option<Self::Item> {
         let volume_scale = self.volume as f64 / std::u8::MAX as f64;
-        let value = (self.pos_in_wave * TWO_PI).sin() * volume_scale;
+        let value = self.base_value() * volume_scale;
 
         self.pos_in_wave = (self.pos_in_wave + self.wave_delta_per_sample) % 1.0;
         self.move_to_target_volume();
@@ -30,6 +42,12 @@ impl Iterator for AudioShapeSynthesizer {
 }
 
 impl AudioShapeSynthesizer {
+    fn base_value(&self) -> f64 {
+        match self.target.waveform {
+            Waveform::Sine => (self.pos_in_wave * TWO_PI).sin(),
+        }
+    }
+
     fn calculate_wave_delta_per_sample(sample_rate: usize, frequency: f64) -> f64 {
         if frequency == 0.0 {
             0.0

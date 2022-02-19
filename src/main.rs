@@ -347,6 +347,7 @@ async fn siren_program() {
         let mut shape = Player::new_shape(AudioShape {
             frequency: 440.0,
             volume: 128,
+            ..Default::default()
         });
         Player::wait(500.0).await;
         shape.set_frequency(400.0);
@@ -367,6 +368,7 @@ async fn play_scale(tonic: MidiNote, scale: Scale, bpm: u64) {
     let mut shape = Player::new_shape(AudioShape {
         frequency: note.frequency(),
         volume: 127,
+        ..Default::default()
     });
 
     let base_scale = match scale {
