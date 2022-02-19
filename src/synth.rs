@@ -58,17 +58,19 @@ fn triangle_wave(t: f64) -> f64 {
     }
 }
 
+fn rectangle_wave(duty_cycle: f64, t: f64) -> f64 {
+    if t < duty_cycle {
+        1.0
+    } else {
+        -1.0
+    }
+}
+
 impl AudioShapeSynthesizer {
     fn base_value(&self) -> f64 {
         match self.target.waveform {
             Waveform::Sine => (self.pos_in_wave * TWO_PI).sin(),
-            Waveform::Square => {
-                if self.pos_in_wave < 0.5 {
-                    1.0
-                } else {
-                    -1.0
-                }
-            }
+            Waveform::Square => rectangle_wave(0.5, self.pos_in_wave),
             Waveform::Triangle => triangle_wave(self.pos_in_wave),
             Waveform::Sawtooth => {
                 if self.pos_in_wave <= 0.5 {
