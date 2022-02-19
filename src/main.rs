@@ -39,6 +39,9 @@ enum Commands {
         note: Option<String>,
         #[clap(arg_enum)]
         scale: Option<Scale>,
+        #[clap(long, arg_enum)]
+        /// Waveform (default sine).
+        wave: Option<Wave>,
         #[clap(long)]
         /// Beats per minute (default 60).
         bpm: Option<u64>,
@@ -58,6 +61,21 @@ enum Commands {
 enum Scale {
     Major,
     MinorHarmonic,
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, ArgEnum)]
+enum Wave {
+    Sine,
+    Square,
+}
+
+impl Into<Waveform> for Wave {
+    fn into(self) -> Waveform {
+        match self {
+            Wave::Sine => Waveform::Sine,
+            Wave::Square => Waveform::Square,
+        }
+    }
 }
 
 impl Args {
@@ -356,19 +374,20 @@ async fn siren_program() {
     }
 }
 
-async fn scale_program(tonic: MidiNote, scale: Scale, bpm: u64, octaves: bool) {
+async fn scale_program(tonic: MidiNote, scale: Scale, bpm: u64, octaves: bool, wave: Waveform) {
     if octaves {
-        Player::start_program(play_scale(tonic + OCTAVE, scale, bpm));
+        Player::start_program(play_scale(tonic + OCTAVE, scale, bpm, wave));
     }
-    play_scale(tonic, scale, bpm).await;
+    play_scale(tonic, scale, bpm, wave).await;
 }
 
-async fn play_scale(tonic: MidiNote, scale: Scale, bpm: u64) {
+async fn play_scale(tonic: MidiNote, scale: Scale, bpm: u64, waveform: Waveform) {
     let beat_settings = BeatSettings::new(bpm, FOUR_FOUR);
     let mut note: MidiNote = tonic;
     let mut shape = Player::new_shape(AudioShape {
         frequency: note.frequency(),
         volume: 127,
+        waveform,
         ..Default::default()
     });
 
@@ -407,6 +426,7 @@ fn main() {
         Commands::Scale {
             note,
             scale,
+            wave,
             bpm,
             octaves,
         } => {
@@ -425,6 +445,7 @@ fn main() {
                 scale.unwrap_or(Scale::Major),
                 bpm.unwrap_or(60),
                 *octaves,
+                wave.unwrap_or(Wave::Sine).into(),
             ))
         }
     }
