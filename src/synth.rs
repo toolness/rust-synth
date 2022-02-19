@@ -5,6 +5,7 @@ pub enum Waveform {
     Sine,
     Square,
     Triangle,
+    Sawtooth,
 }
 
 impl Default for Waveform {
@@ -69,6 +70,13 @@ impl AudioShapeSynthesizer {
                 }
             }
             Waveform::Triangle => triangle_wave(self.pos_in_wave),
+            Waveform::Sawtooth => {
+                if self.pos_in_wave <= 0.5 {
+                    lerp(0.0, 1.0, self.pos_in_wave / 0.5)
+                } else {
+                    lerp(-1.0, 0.0, (self.pos_in_wave - 0.5) / 0.5)
+                }
+            }
         }
     }
 

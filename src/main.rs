@@ -68,6 +68,7 @@ enum Wave {
     Sine,
     Square,
     Triangle,
+    Sawtooth,
 }
 
 impl Into<Waveform> for Wave {
@@ -76,6 +77,7 @@ impl Into<Waveform> for Wave {
             Wave::Sine => Waveform::Sine,
             Wave::Square => Waveform::Square,
             Wave::Triangle => Waveform::Triangle,
+            Wave::Sawtooth => Waveform::Sawtooth,
         }
     }
 }
