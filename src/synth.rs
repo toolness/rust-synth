@@ -3,6 +3,7 @@ const TWO_PI: f64 = 2.0 * std::f64::consts::PI;
 #[derive(Copy, Clone)]
 pub enum Waveform {
     Sine,
+    Square,
 }
 
 impl Default for Waveform {
@@ -45,6 +46,13 @@ impl AudioShapeSynthesizer {
     fn base_value(&self) -> f64 {
         match self.target.waveform {
             Waveform::Sine => (self.pos_in_wave * TWO_PI).sin(),
+            Waveform::Square => {
+                if self.pos_in_wave < 0.5 {
+                    1.0
+                } else {
+                    -1.0
+                }
+            }
         }
     }
 

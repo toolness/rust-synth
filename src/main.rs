@@ -17,7 +17,7 @@ mod waiter;
 use instrument::Instrument;
 use note::{MidiNote, MAJOR_SCALE, MINOR_HARMONIC_SCALE, OCTAVE};
 use player::{Player, PlayerProgram, PlayerProxy, WAV_CHANNELS, WAV_SAMPLE_RATE};
-use synth::AudioShape;
+use synth::{AudioShape, Waveform};
 
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
@@ -347,6 +347,7 @@ async fn siren_program() {
         let mut shape = Player::new_shape(AudioShape {
             frequency: 440.0,
             volume: 128,
+            waveform: Waveform::Square,
             ..Default::default()
         });
         Player::wait(500.0).await;
