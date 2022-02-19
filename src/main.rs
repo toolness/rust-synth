@@ -152,8 +152,8 @@ fn build_stream<P: PlayerProgram>(program: P) -> PlayerProxy {
 
 async fn tuna_program() {
     let beats = BeatSettings::new(80, FOUR_FOUR);
-    let left_hand = Instrument::new(beats, 63);
-    let right_hand = Instrument::new(beats, 63);
+    let left_hand = Instrument::new(beats, 16, Waveform::Square);
+    let right_hand = Instrument::new(beats, 63, Waveform::Triangle);
 
     async fn tuna_fish_tuna_fish(mut right_hand: Instrument, mut left_hand: Instrument) {
         Player::start_program(async move {
@@ -259,7 +259,7 @@ async fn captain_silver_program() {
     let beats = BeatSettings::new(120, FOUR_FOUR);
 
     let right_hand = async move {
-        let mut hand = Instrument::new(beats, 63);
+        let mut hand = Instrument::new(beats, 16, Waveform::Square);
 
         // Measures 1-4
         for _ in 0..5 {
@@ -297,7 +297,7 @@ async fn captain_silver_program() {
     };
 
     let left_hand = async move {
-        let mut hand = Instrument::new(beats, 63);
+        let mut hand = Instrument::new(beats, 63, Waveform::Triangle);
 
         // Measures 1-4
         for _ in 0..5 {

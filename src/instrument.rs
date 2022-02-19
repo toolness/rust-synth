@@ -4,7 +4,7 @@ use crate::{
     beat::{Beat, BeatCounter, BeatSettings},
     note::MidiNoteLike,
     player::{AudioShapeProxy, Player},
-    synth::AudioShape,
+    synth::{AudioShape, Waveform},
 };
 
 // Amount of time to pause between notes (when not slurring)
@@ -19,10 +19,13 @@ pub struct Instrument {
 }
 
 impl Instrument {
-    pub fn new(beat_settings: BeatSettings, max_volume: u8) -> Self {
+    pub fn new(beat_settings: BeatSettings, max_volume: u8, waveform: Waveform) -> Self {
         Instrument {
             beat_counter: Arc::new(Mutex::new(BeatCounter::new(beat_settings))),
-            shape: Arc::new(Mutex::new(Player::new_shape(AudioShape::default()))),
+            shape: Arc::new(Mutex::new(Player::new_shape(AudioShape {
+                waveform,
+                ..Default::default()
+            }))),
             max_volume,
             start_time: Player::current_time(),
         }
