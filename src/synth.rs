@@ -4,6 +4,7 @@ const TWO_PI: f64 = 2.0 * std::f64::consts::PI;
 pub enum Waveform {
     Sine,
     Square,
+    Triangle,
 }
 
 impl Default for Waveform {
@@ -42,6 +43,20 @@ impl Iterator for AudioShapeSynthesizer {
     }
 }
 
+fn lerp(a: f64, b: f64, t: f64) -> f64 {
+    a + (b - a) * t
+}
+
+fn triangle_wave(t: f64) -> f64 {
+    if t <= 0.25 {
+        lerp(0.0, 1.0, t / 0.25)
+    } else if t <= 0.75 {
+        lerp(1.0, -1.0, (t - 0.25) / 0.5)
+    } else {
+        lerp(-1.0, 0.0, (t - 0.75) / 0.25)
+    }
+}
+
 impl AudioShapeSynthesizer {
     fn base_value(&self) -> f64 {
         match self.target.waveform {
@@ -53,6 +68,7 @@ impl AudioShapeSynthesizer {
                     -1.0
                 }
             }
+            Waveform::Triangle => triangle_wave(self.pos_in_wave),
         }
     }
 
@@ -108,5 +124,30 @@ impl AudioShapeSynthesizer {
         } else {
             self.volume -= 1;
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::synth::{lerp, triangle_wave};
+
+    #[test]
+    fn test_lerp_works() {
+        assert_eq!(lerp(0.0, 10.0, 0.0), 0.0);
+        assert_eq!(lerp(0.0, 10.0, 1.0), 10.0);
+        assert_eq!(lerp(0.0, 10.0, 0.5), 5.0);
+
+        assert_eq!(lerp(10.0, 0.0, 0.0), 10.0);
+        assert_eq!(lerp(10.0, 0.0, 1.0), 0.0);
+        assert_eq!(lerp(10.0, 0.0, 0.5), 5.0);
+    }
+
+    #[test]
+    fn test_triangle_wave_works() {
+        assert_eq!(triangle_wave(0.0), 0.0);
+        assert_eq!(triangle_wave(0.25), 1.0);
+        assert_eq!(triangle_wave(0.5), 0.0);
+        assert_eq!(triangle_wave(0.75), -1.0);
+        assert_eq!(triangle_wave(1.0), 0.0);
     }
 }

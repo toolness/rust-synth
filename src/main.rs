@@ -67,6 +67,7 @@ enum Scale {
 enum Wave {
     Sine,
     Square,
+    Triangle,
 }
 
 impl Into<Waveform> for Wave {
@@ -74,6 +75,7 @@ impl Into<Waveform> for Wave {
         match self {
             Wave::Sine => Waveform::Sine,
             Wave::Square => Waveform::Square,
+            Wave::Triangle => Waveform::Triangle,
         }
     }
 }
