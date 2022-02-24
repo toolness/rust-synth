@@ -158,13 +158,13 @@ async fn witch_program() {
     let mut right_hand = Instrument::new(beats, 63, Waveform::Triangle);
 
     Player::start_program(async move {
-        left_hand.rest(Beat::Half).await;
+        left_hand.skip(Beat::Half);
         left_hand.rest(Beat::Quarter).await;
         left_hand.play_note("F3", Beat::Quarter).await;
         left_hand.play_chord(&["A3", "C4"], Beat::Half).await;
     });
 
-    right_hand.rest(Beat::Half).await;
+    right_hand.skip(Beat::Whole);
     right_hand.play_note("C5", Beat::Quarter).await;
     right_hand.play_note("A4", Beat::Quarter).await;
     right_hand.play_note("G4", Beat::Quarter).await;

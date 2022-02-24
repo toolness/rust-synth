@@ -31,6 +31,15 @@ impl Instrument {
         }
     }
 
+    pub fn skip(&mut self, length: Beat) {
+        let ms = {
+            let mut beat_counter = self.beat_counter.try_lock().unwrap();
+            beat_counter.increment(length);
+            beat_counter.total_millis()
+        };
+        self.start_time -= ms;
+    }
+
     fn duplicate(&self) -> Self {
         let cloned_shape = self.shape.try_lock().unwrap().clone();
         let shape = Arc::new(Mutex::new(cloned_shape));
