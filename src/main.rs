@@ -1,6 +1,6 @@
 use std::process::Command;
 
-use beat::{Beat, BeatSettings, FOUR_FOUR};
+use beat::{Beat, BeatSettings, FOUR_FOUR, THREE_FOUR};
 use clap::{AppSettings, ArgEnum, Parser, Subcommand};
 use cpal::traits::{DeviceTrait, HostTrait};
 use cpal::SampleFormat;
@@ -55,6 +55,8 @@ enum Commands {
     CaptainSilver {},
     /// Plays the song "Tune of the Tuna Fish" from pg. 29 of Schaum's Red Book (Alfred).
     Tuna {},
+    /// Plays the song "Which is Witch?" from pg. 30 of Schaum's Red Book (Alfred).
+    Witch {},
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, ArgEnum)]
@@ -148,6 +150,25 @@ fn build_stream<P: PlayerProgram>(program: P) -> PlayerProxy {
         SampleFormat::I16 => Player::get_stream::<i16, P>(device, &config, program),
         SampleFormat::U16 => Player::get_stream::<u16, P>(device, &config, program),
     }
+}
+
+async fn witch_program() {
+    let beats = BeatSettings::new(80, THREE_FOUR);
+    let mut left_hand = Instrument::new(beats, 16, Waveform::Square);
+    let mut right_hand = Instrument::new(beats, 63, Waveform::Triangle);
+
+    Player::start_program(async move {
+        left_hand.rest(Beat::Half).await;
+        left_hand.rest(Beat::Quarter).await;
+        left_hand.play_note("F3", Beat::Quarter).await;
+        left_hand.play_chord(&["A3", "C4"], Beat::Half).await;
+    });
+
+    right_hand.rest(Beat::Half).await;
+    right_hand.play_note("C5", Beat::Quarter).await;
+    right_hand.play_note("A4", Beat::Quarter).await;
+    right_hand.play_note("G4", Beat::Quarter).await;
+    right_hand.play_note("F4", Beat::Quarter).await;
 }
 
 async fn tuna_program() {
@@ -423,6 +444,9 @@ fn main() {
         }
         Commands::Tuna {} => {
             cli.run_program(tuna_program());
+        }
+        Commands::Witch {} => {
+            cli.run_program(witch_program());
         }
         Commands::Siren {} => {
             cli.run_program(siren_program());

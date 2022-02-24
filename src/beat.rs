@@ -1,3 +1,4 @@
+pub const THREE_FOUR: TimeSignature = TimeSignature(3, Beat::Quarter);
 pub const FOUR_FOUR: TimeSignature = TimeSignature(4, Beat::Quarter);
 
 #[derive(Debug, Copy, Clone)]
