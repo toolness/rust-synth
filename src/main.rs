@@ -167,6 +167,11 @@ async fn witch_program() {
             left_hand.play_note("F3", Beat::Quarter).await;
             left_hand.play_chord(&["A3", "C4"], Beat::Half).await;
         }
+
+        // Measure 4
+        left_hand.play_note("G3", Beat::Quarter).await;
+        left_hand.play_chord(&["Bb3", "C4"], Beat::Quarter).await;
+        left_hand.play_chord(&["Bb3", "C4"], Beat::Quarter).await;
     });
 
     // Weird end beat thing
@@ -181,6 +186,9 @@ async fn witch_program() {
     // Measure 3
     right_hand.play_note("A4", Beat::Half).await;
     right_hand.play_note("F4", Beat::Quarter).await;
+
+    // Measure 4
+    right_hand.play_note("C5", Beat::DottedHalf).await;
 }
 
 async fn tuna_program() {

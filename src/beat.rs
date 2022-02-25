@@ -5,10 +5,15 @@ pub const FOUR_FOUR: TimeSignature = TimeSignature(4, Beat::Quarter);
 #[allow(dead_code)]
 pub enum Beat {
     Whole,
+    DottedHalf,
     Half,
+    DottedQuarter,
     Quarter,
+    DottedEighth,
     Eighth,
+    DottedSixteenth,
     Sixteenth,
+    DottedThirtySecond,
     ThirtySecond,
     SixtyFourth,
 }
@@ -17,10 +22,15 @@ impl Beat {
     pub fn sixty_fourth_beats(&self) -> u64 {
         match self {
             Beat::Whole => 64,
+            Beat::DottedHalf => 48,
             Beat::Half => 32,
+            Beat::DottedQuarter => 24,
             Beat::Quarter => 16,
+            Beat::DottedEighth => 12,
             Beat::Eighth => 8,
+            Beat::DottedSixteenth => 6,
             Beat::Sixteenth => 4,
+            Beat::DottedThirtySecond => 3,
             Beat::ThirtySecond => 2,
             Beat::SixtyFourth => 1,
         }
