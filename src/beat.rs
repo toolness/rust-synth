@@ -14,20 +14,16 @@ pub enum Beat {
 }
 
 impl Beat {
-    pub fn divisor(&self) -> u64 {
-        match self {
-            Beat::Whole => 1,
-            Beat::Half => 2,
-            Beat::Quarter => 4,
-            Beat::Eighth => 8,
-            Beat::Sixteenth => 16,
-            Beat::ThirtySecond => 32,
-            Beat::SixtyFourth => 64,
-        }
-    }
-
     pub fn sixty_fourth_beats(&self) -> u64 {
-        64 / self.divisor()
+        match self {
+            Beat::Whole => 64,
+            Beat::Half => 32,
+            Beat::Quarter => 16,
+            Beat::Eighth => 8,
+            Beat::Sixteenth => 4,
+            Beat::ThirtySecond => 2,
+            Beat::SixtyFourth => 1,
+        }
     }
 }
 
@@ -59,9 +55,9 @@ impl BeatSettings {
     }
 
     fn beats_in_duration(&self, length: Beat) -> f64 {
-        let beat_unit_divisor = self.time_signature.beat_unit().divisor();
-        let length_divisor = length.divisor();
-        beat_unit_divisor as f64 / length_divisor as f64
+        let beat_unit_64th_beats = self.time_signature.beat_unit().sixty_fourth_beats();
+        let length_64th_beats = length.sixty_fourth_beats();
+        length_64th_beats as f64 / beat_unit_64th_beats as f64
     }
 
     pub fn duration_in_millis(&self, length: Beat) -> f64 {
