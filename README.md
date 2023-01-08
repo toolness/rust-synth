@@ -1,5 +1,7 @@
 This is an attempt to make a music synthesizer in Rust.
 
+Currently it can synthesize sine, square, triangle, and sawtooth waves. Using these waveforms, it can play scales, as well as some of the songs from the piano book I (Atul Varma) am learning from.
+
 ## Quick start
 
 ```
